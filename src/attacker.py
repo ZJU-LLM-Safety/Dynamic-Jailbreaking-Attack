@@ -1776,29 +1776,6 @@ class DynamicTemperatureAttacker:
         return results
 
 
-def create_output_filename_and_path(
-    save_dir: str,
-    inupt_filename: str,  # name only, no need to add path
-    attacker_name: str = "DyTA",
-    num_iters: int = 10,
-    num_inner_iters: int = 200,
-    reference_model_infer_temperature: float = 1.0,
-    num_ref_infer_samples: int = 10,
-    forward_response_length: int = 20,
-    version: Optional[str] = None,
-):
-    """
-    Create the output filename based on the parameters.
-    """
-    output_filename = (
-        f"{attacker_name}_res_{inupt_filename}_T{reference_model_infer_temperature}_S{num_ref_infer_samples}_FRL{forward_response_length}_NOI{num_iters}_NII{num_inner_iters}"
-    )
-    if version is not None:
-        output_filename += f"_{version}"
-    output_filename += ".jsonl"
-    output_filepath = os.path.join(save_dir, output_filename)
-    return output_filepath
-
 
 def attack_on_whole_dataset():
     fn = "../data/raw/advbench_100_custom.csv"

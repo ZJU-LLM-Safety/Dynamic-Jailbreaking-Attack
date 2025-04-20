@@ -9,6 +9,7 @@ from transformers import (
     AutoModelForCausalLM,
     is_wandb_available,
     Trainer,
+    pipeline,
 )
 from peft import PeftModel, PeftConfig, get_peft_model
 from typing import Optional, Dict, Any, Generator
@@ -19,7 +20,7 @@ import time
 import torch.nn.functional as F
 from peft import AdaLoraConfig, TaskType, get_peft_model
 import torch.optim as optim
-
+import os
 
 if is_wandb_available():
     import wandb
@@ -259,5 +260,44 @@ def load_target_set(fn):
     data = pd.read_csv(fn)
 
     goals = data["goal"].tolist()
-    
+
     return goals
+
+
+def create_output_filename_and_path(
+    save_dir: str,
+    inupt_filename: str,  # name only, no need to add path
+    attacker_name: str = "DyTA",
+    num_iters: int = 10,
+    num_inner_iters: int = 200,
+    reference_model_infer_temperature: float = 1.0,
+    num_ref_infer_samples: int = 10,
+    forward_response_length: int = 20,
+    version: Optional[str] = None,
+):
+    """
+    Create the output filename based on the parameters.
+    """
+    output_filename = f"{attacker_name}_res_{inupt_filename}_T{reference_model_infer_temperature}_S{num_ref_infer_samples}_FRL{forward_response_length}_NOI{num_iters}_NII{num_inner_iters}"
+    if version is not None:
+        output_filename += f"_{version}"
+    output_filename += ".jsonl"
+    output_filepath = os.path.join(save_dir, output_filename)
+    return output_filepath
+
+
+def get_model_inference_pipeline(model_id, device = "cuda:0"):
+    model = AutoModelForCausalLM.from_pretrained(
+        model_id,
+        torch_dtype=torch.float16,
+    )
+    model = model.to(device)
+    tokenizer = AutoTokenizer.from_pretrained(
+        model_id,
+    )
+    tokenizer.pad_token = tokenizer.eos_token
+    pipe = pipeline(
+        "text-generation", model=model, tokenizer=tokenizer, max_new_tokens=4096, 
+        device = device,
+    )
+    return pipe

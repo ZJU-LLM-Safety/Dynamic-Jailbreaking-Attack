@@ -29,6 +29,12 @@ def parse_args():
         "General arguments for the attacker.",
     )
     parser.add_argument(
+        "--attacker-name",
+        type=str,
+        default="DyTA",
+        help="The name of the attacker.",
+    )
+    parser.add_argument(
         "--local-llm-name-or-path",
         type=str,
         default="/hub/huggingface/models/meta/llama-3-8B-Instruct",
@@ -75,6 +81,12 @@ def parse_args():
         default = "float16",
         help = "The torch dtype of the model. Options: float16, bfloat16, float32.",
     )
+    
+    parser.add_argument_group(
+        "Attack",
+        "Arguments for the attack.",
+    )
+    
     parser.add_argument(
         "--reference-temperature",
         type = float, 
@@ -98,4 +110,34 @@ def parse_args():
         type = int,
         default = 30,
         help = "The maximum length of the response (i.e., the output) from the forward model.",
+    )
+    
+    parser.add_argument(
+        "--num-outer-iterations",
+        type = int,
+        default = 20,
+        help = "The number of outer iterations for the attack.",
+    )
+    
+    parser.add_argument(
+        "--num-inner-iterations",
+        type = int,
+        default = 5,
+        help = "The number of inner iterations for the attack.",
+    )
+    
+    parser.add_argument(
+        "--learning-rate",
+        type = float,
+        default = 1.5,
+        help = "The learning rate for the attack.",
+    )
+    parser.add_argument(
+        "--suffix-length",
+        type = int,
+        default = 20,
+        help = "The length of the suffix to be generated.",
+    )
+    parser.add_argument(
+        "--"
     )
