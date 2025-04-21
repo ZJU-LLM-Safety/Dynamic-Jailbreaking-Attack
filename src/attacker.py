@@ -16,6 +16,118 @@ from torch.utils.checkpoint import checkpoint
 import json
 import os
 
+
+REJ_WORDS = [
+    "sorry",
+    "apologetic",
+    "regretful",
+    "unethical",
+    "immoral",
+    "dishonest",
+    "illegal",
+    "unlawful",
+    "illicit",
+    "harmful",
+    "detrimental",
+    "injurious",
+    "afraid",
+    "fearful",
+    "apprehensive",
+    "cannot",
+    "unable",
+    "apologize",
+    "regret",
+    "unable",
+    "incapable",
+    "powerless",
+    "not",
+    "no",
+    "nay",
+    "responsible",
+    "accountable",
+    "liable",
+    "ethic",
+    "morality",
+    "moral",
+    "legal",
+    "lawful",
+    "legitimate",
+    "ethical",
+    "moral",
+    "principled",
+    "fulfill",
+    "accomplish",
+    "achieve",
+    "just",
+    "fair",
+    "equitable",
+    "trustworthy",
+    "reliable",
+    "dependable",
+    "repentant",
+    "penitent",
+    "remorseful",
+    "unprincipled",
+    "unscrupulous",
+    "corrupt",
+    "unlawful",
+    "prohibited",
+    "forbidden",
+    "noxious",
+    "destructive",
+    "damaging",
+    "timid",
+    "terrified",
+    "panicked",
+    "unable",
+    "incompetent",
+    "incapacitated",
+    "prohibited",
+    "banned",
+    "forbidden",
+    "deny",
+    "refuse",
+    "decline",
+    "answerable",
+    "culpable",
+    "answerable",
+    "moral code",
+    "values",
+    "principles",
+    "legitimate",
+    "valid",
+    "authorized",
+    "virtuous",
+    "righteous",
+    "honorable",
+    "satisfy",
+    "complete",
+    "execute",
+    "fair-minded",
+    "impartial",
+    "equitable",
+    "reliable",
+    "trustable",
+    "faithful",
+    "invalid",
+    "safe",
+    "not",
+    "can't",
+    "but",
+    "against",
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+]
+
+
 class DynamicTemperatureAttacker:
     def __init__(
         self, 
@@ -1314,6 +1426,7 @@ class DynamicTemperatureAttacker:
         suffix_length: int, 
         temperature: float = 1.0,
         top_k: int = 10,
+        rej_word_mask: torch.Tensor = None,
     ):
         output = model.generate(
             input_ids=prompt_ids,
@@ -1323,7 +1436,15 @@ class DynamicTemperatureAttacker:
         )
 
         init_suffix_logits = model(output).logits
-        init_suffix_logits = init_suffix_logits[:, -(suffix_length + 1) : -1, :] / temperature
+        init_suffix_logits = init_suffix_logits[:, -(suffix_length + 1) : -1, :] 
+        # mask rejection words
+        if rej_word_mask is not None:
+            # print("init_suffix_logits.shape: ", init_suffix_logits.shape)
+            # print("rej_word_mask.shape: ", rej_word_mask.shape)
+            init_suffix_logits = init_suffix_logits + rej_word_mask * -1e10
+            # init_suffix_logits.scatter_(1, rej_word_mask, -1e10)
+        # 取出后缀部分的logits
+        init_suffix_logits = init_suffix_logits / temperature
         return init_suffix_logits
 
     def optimize_single_prompt_with_suffix_in_double_loop(
@@ -1337,6 +1458,7 @@ class DynamicTemperatureAttacker:
         suffix_max_length: int = 20,
         suffix_topk: int = 10,
         suffix_init_token: str = "!",
+        mask_rejection_words: bool = False,
         verbose: bool = False,
     ):
         print("prompt: ", prompt)
@@ -1345,6 +1467,20 @@ class DynamicTemperatureAttacker:
         )
         prompt_length = prompt_ids.shape[1]
         prompt_embeddings = self.local_llm.get_input_embeddings()(prompt_ids)
+
+        if not mask_rejection_words:
+            rej_word_mask = None
+        else:
+            rej_words = REJ_WORDS + [word.upper() for word in REJ_WORDS] + [
+                word.lower() for word in REJ_WORDS
+            ] + [word.capitalize() for word in REJ_WORDS]
+            rej_words = " ".join(list(set(rej_words)))
+            rej_word_ids = self.local_llm_tokenizer.encode(
+                rej_words, add_special_tokens=False, return_tensors="pt"
+            )
+            rej_word_mask = torch.zeros(size = (1, self.local_llm.get_input_embeddings().weight.shape[0]), dtype = self.dtype, device = self.local_llm_device)
+            rej_word_mask[0, rej_word_ids] = 1.0
+            rej_word_mask = rej_word_mask.unsqueeze(1).repeat(1, suffix_max_length, 1) # (1, suffix_max_length, V)
 
         log_dict = {}
         best_unsafe_score = -1.0
@@ -1363,9 +1499,12 @@ class DynamicTemperatureAttacker:
                     prompt_ids = prompt_ids,
                     suffix_length = suffix_max_length,
                     top_k = suffix_topk,
+                    rej_word_mask = rej_word_mask,
                 )
             else:
                 init_suffix_logits = suffix_logits.detach().clone()
+                if rej_word_mask is not None:
+                    init_suffix_logits = init_suffix_logits + rej_word_mask * -1e10
 
             # 让整个logits变得陡峭来模拟one-hot
             soft_init_logits = init_suffix_logits / 0.001
@@ -1460,6 +1599,7 @@ class DynamicTemperatureAttacker:
                         suffix_logits, 
                         suffix_topk, 
                         suffix_mask, 
+                        rej_word_mask = rej_word_mask
                     )
                     soft_suffix_logits = soft_suffix_logits / 0.001
 
@@ -1489,6 +1629,7 @@ class DynamicTemperatureAttacker:
                     self.topk_filter_3d(
                         pred_suffix_logits,
                         topk = suffix_topk,
+                        rej_word_mask = rej_word_mask,
                     ),
                     suffix_logits 
                 )
@@ -1544,15 +1685,29 @@ class DynamicTemperatureAttacker:
 
                 ce_loss = ce_loss.view(batch_size, -1).mean(-1)
                 # print("ce_loss: ", ce_loss)
+
+                # step 3.3.0 Calculate the rejection word loss if possible
+                if rej_word_mask is not None:
+                    rej_word_loss = self.batch_log_bleulosscnn_ae(
+                        decoder_outputs=suffix_logits.transpose(0, 1),
+                        target_idx = rej_word_ids.to(self.local_llm_device),
+                        ngram_list = [1, 2, 3],
+                    )
+                else:
+                    rej_word_loss = None
+
                 # step 3.3 Calculate the total loss
-                loss = ce_loss * 100 + suffix_flu_loss
+                if rej_word_loss is not None:
+                    loss = ce_loss * 100 + suffix_flu_loss + rej_word_loss
+                else:
+                    loss = ce_loss * 100 + suffix_flu_loss
                 loss = loss.mean()
 
                 # step 3.4 Backward
                 loss.backward()
                 optimizer.step()
                 scheduler.step()
-                if (j + 1) % 50 == 0 or j == num_inner_iters - 1:
+                if verbose and (j + 1) % 50 == 0 or j == num_inner_iters - 1:
                     print(
                         "Loss: ",
                         loss.item(),
@@ -1664,6 +1819,7 @@ class DynamicTemperatureAttacker:
         suffix_logits, 
         topk = 10, 
         suffix_mask = None,
+        rej_word_mask = None,
     ):
         INF = 1e20
         if topk == 0:
@@ -1672,6 +1828,9 @@ class DynamicTemperatureAttacker:
             if suffix_mask is None:
                 _, indices = torch.topk(suffix_logits, topk, dim=-1)
                 suffix_mask = torch.zeros_like(suffix_logits).scatter_(2, indices, 1)
+                if rej_word_mask is not None:
+                    suffix_mask = (suffix_mask + rej_word_mask.float()) > 0
+                suffix_mask = suffix_mask.float()
         return suffix_logits * suffix_mask + (1 - suffix_mask) * -INF
 
     def soft_negative_likelihood_loss(
@@ -1682,6 +1841,69 @@ class DynamicTemperatureAttacker:
         probs = F.softmax(pred_logits, dim = -1)
         log_probs = F.log_softmax(target_logits, dim = -1)
         loss = -torch.sum(probs * log_probs, dim = -1).mean(dim = -1)
+        return loss
+
+    # @ from COLD-Attack
+    def batch_log_bleulosscnn_ae(self, decoder_outputs, target_idx, ngram_list, pad=0, weight_list=None):
+        """
+        decoder_outputs: [output_len, batch_size, vocab_size]
+            - matrix with probabilityes  -- log probs
+        target_variable: [batch_size, target_len]
+            - reference batch
+        ngram_list: int or List[int]
+            - n-gram to consider
+        pad: int
+            the idx of "pad" token
+        weight_list : List
+            corresponding weight of ngram
+
+        NOTE: output_len == target_len
+        """
+        decoder_outputs = decoder_outputs.transpose(0,1)
+        batch_size, output_len, vocab_size = decoder_outputs.size()
+        _, tgt_len = target_idx.size()
+        if type(ngram_list) == int:
+            ngram_list = [ngram_list]
+        if ngram_list[0] <= 0:
+            ngram_list[0] = output_len
+        if weight_list is None:
+            weight_list = [1. / len(ngram_list)] * len(ngram_list)
+        decoder_outputs = torch.log_softmax(decoder_outputs,dim=-1)
+        decoder_outputs = torch.relu(decoder_outputs + 20) - 20
+        index = target_idx.unsqueeze(1).expand(-1, output_len, tgt_len)
+        cost_nll = decoder_outputs.gather(dim=2, index=index)
+        cost_nll = cost_nll.unsqueeze(1)
+        out = cost_nll
+        sum_gram = 0. #FloatTensor([0.])
+        ###########################
+        zero = torch.tensor(0.0).to(decoder_outputs.device)
+        target_expand = target_idx.view(batch_size,1,1,-1).expand(-1,-1,output_len,-1)
+        out = torch.where(target_expand==pad, zero, out)
+        ############################
+        for cnt, ngram in enumerate(ngram_list):
+            if ngram > output_len:
+                continue
+            eye_filter = torch.eye(ngram).view([1, 1, ngram, ngram]).to(decoder_outputs.device)
+            term = nn.functional.conv2d(out, eye_filter)/ngram
+            if ngram < decoder_outputs.size()[1]:
+                term = term.squeeze(1)
+                gum_tmp = F.gumbel_softmax(term, tau=1, dim=1)
+                term = term.mul(gum_tmp).sum(1).mean(1)
+            else:
+                while len(term.shape) > 1:
+                    assert term.shape[-1] == 1, str(term.shape)
+                    term = term.sum(-1)
+            try:
+                sum_gram += weight_list[cnt] * term
+            except:
+                print(sum_gram.shape)
+                print(term.shape)
+                print((weight_list[cnt] * term).shape)
+                print(ngram)
+                print(decoder_outputs.size()[1])
+                assert False
+
+        loss = - sum_gram
         return loss
 
     def attack(
@@ -1696,6 +1918,7 @@ class DynamicTemperatureAttacker:
         suffix_max_length: int = 20,
         suffix_topk: int = 10,
         suffix_init_token: str = "!",
+        mask_rejection_words: bool = False,
         verbose: bool = False,
         save_path: Optional[str] = None,
     ) -> List[str]:
@@ -1754,6 +1977,7 @@ class DynamicTemperatureAttacker:
                 suffix_max_length=suffix_max_length,
                 suffix_topk=suffix_topk,
                 suffix_init_token=suffix_init_token,
+                mask_rejection_words=mask_rejection_words,
                 verbose=verbose,
             )
             results.append(
@@ -1774,7 +1998,6 @@ class DynamicTemperatureAttacker:
                     json.dumps(results[-1], ensure_ascii=False) + "\n"
                 )
         return results
-
 
 
 def attack_on_whole_dataset():
