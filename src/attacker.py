@@ -15,6 +15,7 @@ from utils import *
 from torch.utils.checkpoint import checkpoint
 import json
 import os
+import pandas as pd
 
 
 REJ_WORDS = [
@@ -113,6 +114,7 @@ REJ_WORDS = [
     "safe",
     "not",
     "can't",
+    "cannot",
     "but",
     "against",
     "0",
@@ -180,7 +182,7 @@ class DynamicTemperatureAttacker:
                 self.ref_local_llm_model_name_or_path,
             )
             self.ref_local_llm_tokenizer.pad_token = self.ref_local_llm_tokenizer.eos_token
-
+        
         self.ref_generator = pipeline(
             "text-generation",
             model=self.ref_local_llm,
@@ -1698,7 +1700,7 @@ class DynamicTemperatureAttacker:
 
                 # step 3.3 Calculate the total loss
                 if rej_word_loss is not None:
-                    loss = ce_loss * 100 + suffix_flu_loss + rej_word_loss
+                    loss = ce_loss * 100 + suffix_flu_loss - 10 * rej_word_loss
                 else:
                     loss = ce_loss * 100 + suffix_flu_loss
                 loss = loss.mean()
@@ -2001,7 +2003,7 @@ class DynamicTemperatureAttacker:
 
 
 def attack_on_whole_dataset():
-    fn = "../data/raw/advbench_100_custom.csv"
+    fn = "../data/raw/DNA_100.csv"
     ############################# TEST 01 ##############################################
     # attacker = DynamicTemperatureAttacker(
     #     local_llm_device="cuda:1",
@@ -2053,26 +2055,33 @@ def attack_on_whole_dataset():
 
     ############################# TEST 03 ##############################################
     attacker = DynamicTemperatureAttacker(
-        local_llm_device="cuda:0",
-        ref_local_llm_device="cuda:2",
-        judge_llm_device="cuda:1",
+        local_llm_device="cuda:2",
+        ref_local_llm_device="cuda:1",
+        judge_llm_device="cuda:2",
         reference_model_infer_temperature=2.0,
         num_ref_infer_samples=30,
     )
-    save_path = (
-        "../data/results/DyTA_res_advbench_100_custom_T2_S30_FRL30_NOI15_NII400.jsonl"
-    )
+    save_path = "../data/results/DyTA_res_DNA_100_T2_S30_FRL40_NOI25_NII200.jsonl"
+
+    with open(fn, "r") as fin:
+        data = pd.read_csv(fin)
+        try:
+            target_set = data["harmful"].tolist()
+        except:
+            target_set = data["goal"].tolist()
     results = attacker.attack(
-        target_fn=fn,
-        num_iters=30,
-        num_inner_iters=400,
+        # target_fn=fn,
+        target_set = target_set,
+        num_iters=25,
+        num_inner_iters=200,
         learning_rate=1.5,
         response_length=256,
-        forward_response_length=30,
+        forward_response_length=40,
         suffix_max_length=20,
         suffix_topk=10,
         suffix_init_token="!",
-        verbose=True,
+        mask_rejection_words=True,
+        verbose=False,
         save_path=save_path,
     )
     #####################################################################################
