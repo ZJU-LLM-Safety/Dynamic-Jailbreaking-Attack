@@ -268,17 +268,21 @@ def create_output_filename_and_path(
     save_dir: str,
     inupt_filename: str,  # name only, no need to add path
     attacker_name: str = "DyTA",
+    local_model_name: str = "Llama3",
     num_iters: int = 10,
     num_inner_iters: int = 200,
     reference_model_infer_temperature: float = 1.0,
     num_ref_infer_samples: int = 10,
     forward_response_length: int = 20,
     version: Optional[str] = None,
+    start_index = 0,
+    end_index = 100,
 ):
     """
     Create the output filename based on the parameters.
     """
-    output_filename = f"{attacker_name}_res_{inupt_filename}_T{reference_model_infer_temperature}_S{num_ref_infer_samples}_FRL{forward_response_length}_NOI{num_iters}_NII{num_inner_iters}"
+    inupt_filename = inupt_filename.split("/")[-1].split(".")[0]
+    output_filename = f"{attacker_name}_{local_model_name}_res_{inupt_filename}_T{reference_model_infer_temperature}_S{num_ref_infer_samples}_FRL{forward_response_length}_NOI{num_iters}_NII{num_inner_iters}_{start_index}_{end_index}"
     if version is not None:
         output_filename += f"_{version}"
     output_filename += ".jsonl"

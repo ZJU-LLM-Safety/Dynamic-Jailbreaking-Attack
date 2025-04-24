@@ -1787,7 +1787,7 @@ class DynamicTemperatureAttacker:
                     print("best test response score: ", best_unsafe_score)
                     print("best iter idx: ", best_iter_idx)
 
-            if (i+1) > 5 and best_unsafe_score >= 0.9: # set minimum outer iterations and minimum score threshold as the conditions of early stopping
+            if (i+1) >= 3 and best_unsafe_score >= 0.9: # set minimum outer iterations and minimum score threshold as the conditions of early stopping
                 break
 
         return best_suffix, best_test_response, best_iter_idx, best_unsafe_score, best_reference_response, best_reference_response_score
@@ -1923,6 +1923,8 @@ class DynamicTemperatureAttacker:
         mask_rejection_words: bool = False,
         verbose: bool = False,
         save_path: Optional[str] = None,
+        start_index: int = 0,
+        end_index: int = 100,
     ) -> List[str]:
         """
         Attack the target set or target function using the specified parameters.
@@ -1960,7 +1962,9 @@ class DynamicTemperatureAttacker:
             fout = open(save_path, "w")
         else:
             fout = None
-        for prompt in tqdm(target_set, desc = "Attacking", total = len(target_set)):
+        for p_idx, prompt in tqdm(enumerate(target_set), desc = "Attacking", total = len(target_set)):
+            if p_idx < start_index or p_idx >= end_index:
+                continue
             print("prompt: ", prompt)
             (
                 best_suffix_str,
@@ -2054,35 +2058,79 @@ def attack_on_whole_dataset():
     # #####################################################################################
 
     ############################# TEST 03 ##############################################
-    attacker = DynamicTemperatureAttacker(
-        local_llm_device="cuda:2",
-        ref_local_llm_device="cuda:1",
-        judge_llm_device="cuda:2",
-        reference_model_infer_temperature=2.0,
-        num_ref_infer_samples=30,
-    )
-    save_path = "../data/results/DyTA_res_DNA_100_T2_S30_FRL40_NOI25_NII200.jsonl"
+    fn = "../data/raw/harmBench_100.csv"
+    # local_llm_model_name_or_path = "/hub/huggingface/models/meta-llama/Llama-2-7b-chat-hf"
+    local_llm_model_name_or_path = "/hub/huggingface/models/meta/llama-3-8B-Instruct"
+    local_model_name = "Llama3"
+    local_llm_device = "cuda:2"
+    ref_local_llm_device = "cuda:0"
+    judge_llm_device = "cuda:2"
+    reference_model_infer_temperature = 2.0
+    num_ref_infer_samples = 30
+    num_outer_iters = 15
+    num_inner_iters = 400
+    learning_rate = 1.5
+    response_length = 256
+    forward_response_length = 30
+    suffix_max_length = 20
+    suffix_topk = 10
+    suffix_init_token = "!"
+    mask_rejection_words = True
+    verbose = False
+    
+    start_index = 0
+    end_index = 100
 
+    save_path = create_output_filename_and_path(
+        save_dir="../data/results/",
+        inupt_filename=fn,
+        attacker_name="DyTA",
+        local_model_name=local_model_name,
+        num_iters=num_outer_iters,
+        num_inner_iters=num_inner_iters,
+        reference_model_infer_temperature=reference_model_infer_temperature,
+        num_ref_infer_samples=num_ref_infer_samples,
+        forward_response_length=forward_response_length,
+        start_index = start_index, 
+        end_index = end_index,
+    )
+
+    attacker = DynamicTemperatureAttacker(
+        local_llm_model_name_or_path=local_llm_model_name_or_path,
+        local_llm_device=local_llm_device,
+        ref_local_llm_device=ref_local_llm_device,
+        judge_llm_device=judge_llm_device,
+        reference_model_infer_temperature=reference_model_infer_temperature,
+        num_ref_infer_samples=num_ref_infer_samples,
+    )
+    # save_path = (
+    #     "../data/results/DyTA_Llama2_res_DNA_100_T2_S30_FRL40_NOI20_NII300.jsonl"
+    # )
+
+    # target_set = []
     with open(fn, "r") as fin:
         data = pd.read_csv(fin)
         try:
             target_set = data["harmful"].tolist()
         except:
             target_set = data["goal"].tolist()
+
     results = attacker.attack(
         # target_fn=fn,
-        target_set = target_set,
-        num_iters=25,
-        num_inner_iters=200,
-        learning_rate=1.5,
-        response_length=256,
-        forward_response_length=40,
-        suffix_max_length=20,
-        suffix_topk=10,
-        suffix_init_token="!",
-        mask_rejection_words=True,
-        verbose=False,
+        target_set=target_set,
+        num_iters=num_outer_iters,
+        num_inner_iters=num_inner_iters,
+        learning_rate=learning_rate,
+        response_length=response_length,
+        forward_response_length=forward_response_length,
+        suffix_max_length=suffix_max_length,
+        suffix_topk=suffix_topk,
+        suffix_init_token=suffix_init_token,
+        mask_rejection_words=mask_rejection_words,
+        verbose=verbose,
         save_path=save_path,
+        start_index = start_index, 
+        end_index = end_index,
     )
     #####################################################################################
 

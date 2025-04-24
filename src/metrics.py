@@ -529,7 +529,9 @@ def get_stl_score(original_prompt, jailbreak_prompt):
 def test_llama_guard3():
     ### 测试结果 92% on res_advbench_100_custom.jsonl
     ### 测试结果 93% on DyTA_res_advbench_100_custom_T2_S15_FRL40_NOI15_NII100DyTA_res_advbench_100_custom_T2_S15_FRL40_NOI15_NII100.jsonl
-    results_fn = "../data/results/res_advbench_100_custom.jsonl"
+    results_fn = (
+        "../data/results/DyTA_Llama2_res_harmBench_100_T2_S20_FRL40_NOI25_NII100.jsonl"
+    )
     data = []
     with open(results_fn, "r") as fin:
         for line in fin:
@@ -946,4 +948,5 @@ if __name__ == "__main__":
     # test_llama_guard3_on_cold_attack_results()
     # test_llama_guard3_on_cold_attack_results_on_three_datasets()
     # test_baseline_results_on_llama3_using_llama_guard3()
-    test_baseline_results_on_llama3_using_GPTFuzzer()
+    # test_baseline_results_on_llama3_using_GPTFuzzer()
+    test_llama_guard3()
