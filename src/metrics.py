@@ -529,9 +529,7 @@ def get_stl_score(original_prompt, jailbreak_prompt):
 def test_llama_guard3():
     ### 测试结果 92% on res_advbench_100_custom.jsonl
     ### 测试结果 93% on DyTA_res_advbench_100_custom_T2_S15_FRL40_NOI15_NII100DyTA_res_advbench_100_custom_T2_S15_FRL40_NOI15_NII100.jsonl
-    results_fn = (
-        "../data/results/DyTA_Llama3_res_DNA_100_T2.0_S30_FRL40_NOI20_NII300.jsonl"
-    )
+    results_fn = "../data/results/DyTA_Mistral-7b_res_advbench_100_T2.0_S30_FRL30_NOI15_NII400_0_100.jsonl"
     data = []
     with open(results_fn, "r") as fin:
         for line in fin:
@@ -552,7 +550,7 @@ def test_llama_guard3():
     total_count = 100
     llama_guard3 = LlamaGuard3()
     llama_model_path = "/hub/huggingface/models/meta/Llama-Guard-3-8B"
-    model_device = "cuda:1"
+    model_device = "cuda:3"
     args = {
         "model_name_or_path": llama_model_path,
         "device": model_device,
@@ -737,7 +735,7 @@ def test_gptfuzzer_on_cold_attack_results():
 
     gptfuzzer = GPTFuzzer()
     model_path = "/hub/huggingface/models/hubert233/GPTFuzz/"
-    model_device = "cuda:1"
+    model_device = "cuda:3"
     args = {
         "model_name_or_path": model_path,
         "device": model_device,
@@ -773,7 +771,7 @@ def test_llama_guard3_on_cold_attack_results_on_three_datasets():
         "DNA",
         "harmBench",
     ]
-    target_model_name = "Llama-2-7b-chat-hf"
+    target_model_name = "Vicuna-7b-v1.5"
     llama_guard3 = None
     for name in dst_name:
         print("=========================")
@@ -791,9 +789,12 @@ def test_llama_guard3_on_cold_attack_results_on_three_datasets():
             prompt_with_adv_data = csv_data["prompt_with_adv"].tolist()
 
         # generator_model_path = "/hub/huggingface/models/meta/llama-3-8B-Instruct"
-        generator_model_path = (
-            "/hub/huggingface/models/meta/llama2-hf/llama-2-7b-chat-hf"
-        )
+        # generator_model_path = (
+        #     "/hub/huggingface/models/meta/llama2-hf/llama-2-7b-chat-hf"
+        # )
+        # generator_model_path = "/hub/huggingface/models/Mistral-7B-Instruct-v0.3"
+        # generator_model_path = "/hub/huggingface/models/Qwen/Qwen2.5-7B-Instruct"
+        generator_model_path = "/hub/huggingface/models/lmsys/vicuna-7b-v1.5"
         generator_model_device = "cuda:3"
 
         for id, (prompt, prompt_with_adv) in enumerate(
@@ -1020,4 +1021,6 @@ if __name__ == "__main__":
     # test_gptfuzzer_on_cold_attack_results()
     # test_llama_guard3_on_cold_attack_results_on_three_datasets()
     # test_gptfuzzer_on_cold_attack_results()
-    test_llama_guard3()
+    # test_llama_guard3()
+    # test_llama_guard3_on_cold_attack_results_on_three_datasets()
+    test_gptfuzzer_on_cold_attack_results()
