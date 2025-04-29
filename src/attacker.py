@@ -2058,7 +2058,7 @@ def attack_on_whole_dataset():
     # #####################################################################################
 
     ############################# TEST 03 ##############################################
-    fn = "../data/raw/harmBench_100.csv"
+    fn = "../data/raw/DNA_100.csv"
     # local_llm_model_name_or_path = "/hub/huggingface/models/meta-llama/Llama-2-7b-chat-hf"
     # local_llm_model_name_or_path = "/hub/huggingface/models/meta/llama-3-8B-Instruct"
     local_llm_model_name_or_path = "/hub/huggingface/models/Mistral-7B-Instruct-v0.3"
