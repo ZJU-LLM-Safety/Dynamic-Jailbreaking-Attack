@@ -2061,26 +2061,27 @@ def attack_on_whole_dataset():
     fn = "../data/raw/DNA_100.csv"
     # local_llm_model_name_or_path = "/hub/huggingface/models/meta-llama/Llama-2-7b-chat-hf"
     # local_llm_model_name_or_path = "/hub/huggingface/models/meta/llama-3-8B-Instruct"
+    # local_model_name = "Llama3"
     local_llm_model_name_or_path = "/hub/huggingface/models/Mistral-7B-Instruct-v0.3"
     local_model_name = "Mistral-7b"
-    local_llm_device = "cuda:1"
-    ref_local_llm_device = "cuda:0"
-    judge_llm_device = "cuda:1"
+    local_llm_device = "cuda:2"
+    ref_local_llm_device = "cuda:3"
+    judge_llm_device = "cuda:2"
     reference_model_infer_temperature = 2.0
     num_ref_infer_samples = 30
     num_outer_iters = 15
     num_inner_iters = 400
     learning_rate = 1.5
     response_length = 256
-    forward_response_length = 30
+    forward_response_length = 30 # 30 in default
     suffix_max_length = 20
     suffix_topk = 10
     suffix_init_token = "!"
     mask_rejection_words = True
     verbose = False
     
-    start_index = 45
-    end_index = 100
+    start_index = 0
+    end_index = 50
 
     save_path = create_output_filename_and_path(
         save_dir="../data/results/",
