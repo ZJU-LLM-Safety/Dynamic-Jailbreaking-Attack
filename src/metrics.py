@@ -667,8 +667,8 @@ def test_llama_guard3_on_cold_attack_results():
     for id, (prompt, prompt_with_adv) in enumerate(zip(prompt_data, prompt_with_adv_data)):
         data.append(
             {
-                "ori_prompt": prompt_with_adv,
-                "prompt": prompt,
+                "ori_prompt": prompt,
+                "prompt": prompt_with_adv,
                 "response": "",
                 "score_keyword": 0,
                 "score_harmful": 0,
@@ -802,8 +802,8 @@ def test_llama_guard3_on_cold_attack_results_on_three_datasets():
         ):
             data.append(
                 {
-                    "ori_prompt": prompt_with_adv,
-                    "prompt": prompt,
+                    "ori_prompt":prompt ,
+                    "prompt": prompt_with_adv,
                     "response": "",
                     "score_keyword": 0,
                     "score_harmful": 0,
