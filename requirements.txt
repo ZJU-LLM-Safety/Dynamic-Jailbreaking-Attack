@@ -93,6 +93,7 @@ pydantic_core==2.33.1
 Pygments @ file:///home/conda/feedstock_root/build_artifacts/pygments_1736243443484/work
 pyparsing==3.1.2
 python-dateutil @ file:///home/conda/feedstock_root/build_artifacts/python-dateutil_1733215673016/work
+python-dotenv>=1.0.0
 pytz==2024.1
 PyYAML==6.0.1
 pyzmq @ file:///home/conda/feedstock_root/build_artifacts/pyzmq_1738270958831/work

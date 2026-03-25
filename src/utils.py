@@ -18,7 +18,7 @@ import contextlib
 import functools
 import time
 import torch.nn.functional as F
-from peft import AdaLoraConfig, TaskType, get_peft_model
+from peft import AdaLoraConfig, TaskType, get_peft_model, LoraConfig
 import torch.optim as optim
 import os
 
@@ -269,6 +269,7 @@ def create_output_filename_and_path(
     inupt_filename: str,  # name only, no need to add path
     attacker_name: str = "DyTA",
     local_model_name: str = "Llama3",
+    ref_model_name: Optional[str] = None,
     num_iters: int = 10,
     num_inner_iters: int = 200,
     reference_model_infer_temperature: float = 1.0,
@@ -282,7 +283,8 @@ def create_output_filename_and_path(
     Create the output filename based on the parameters.
     """
     inupt_filename = inupt_filename.split("/")[-1].split(".")[0]
-    output_filename = f"{attacker_name}_{local_model_name}_res_{inupt_filename}_T{reference_model_infer_temperature}_S{num_ref_infer_samples}_FRL{forward_response_length}_NOI{num_iters}_NII{num_inner_iters}_{start_index}_{end_index}"
+    ref_model_name = ref_model_name if ref_model_name is not None else local_model_name
+    output_filename = f"{attacker_name}_{local_model_name}_{ref_model_name}_res_{inupt_filename}_T{reference_model_infer_temperature}_S{num_ref_infer_samples}_FRL{forward_response_length}_NOI{num_iters}_NII{num_inner_iters}_{start_index}_{end_index}"
     if version is not None:
         output_filename += f"_{version}"
     output_filename += ".jsonl"

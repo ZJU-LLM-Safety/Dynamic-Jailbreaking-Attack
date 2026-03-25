@@ -1,2 +1,9 @@
 
 .history/*
+
+data/
+scripts/
+.env
+src/.env
+__pycache__/
+*.pyc

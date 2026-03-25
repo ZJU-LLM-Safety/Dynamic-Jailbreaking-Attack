@@ -183,20 +183,20 @@ class DynamicTemperatureAttacker:
             )
             self.ref_local_llm_tokenizer.pad_token = self.ref_local_llm_tokenizer.eos_token
         
-        self.ref_generator = pipeline(
-            "text-generation",
-            model=self.ref_local_llm,
-            tokenizer=self.ref_local_llm_tokenizer,
-            device=self.ref_local_llm_device,
-            max_length=256,
-            do_sample=True,
-            temperature = 0.7
-        )
+        # self.ref_generator = pipeline(
+        #     "text-generation",
+        #     model=self.ref_local_llm,
+        #     tokenizer=self.ref_local_llm_tokenizer,
+        #     device=self.ref_local_llm_device,
+        #     max_length=256,
+        #     do_sample=True,
+        #     temperature = 0.7
+        # )
 
         self.ref_local_llm.to(self.ref_local_llm_device)
         self.ref_local_llm.eval()
 
-        local_llm_peft_config = AdaLoraConfig(
+        local_llm_peft_config = LoraConfig(
             task_type=TaskType.CAUSAL_LM,
             inference_mode=False,
             r=32,
@@ -690,7 +690,6 @@ class DynamicTemperatureAttacker:
         top_p=0.95,
         num_return_sequences=10,
         max_length=256,
-        
         do_sample=True,
         use_cache=True,  # 启用KV缓存
         batch_size_per_run=4,  # 批处理大小，用于控制内存使用
@@ -784,13 +783,13 @@ class DynamicTemperatureAttacker:
         if input_embeddings is not None:
             # print("Method 2")
             try:
-
+                # print(".............2.1")
                 # 获取近似的输入ID
                 approximate_input_ids = self._get_approximate_token_ids_from_embeddings(
                     model=model,
                     input_embeddings=input_embeddings
                 )
-
+                # print(".............2.2")
                 # 使用这些近似ID来生成
                 outputs = model.generate(
                     input_ids=approximate_input_ids,
@@ -817,6 +816,8 @@ class DynamicTemperatureAttacker:
                     return outputs
             except (RuntimeError, ValueError, TypeError) as e:
                 # 如果方法2失败，回退到方法3
+                print("Method 2 failed...")
+                print("Exception: ", e)
                 pass
 
         # 方法3: 优化后的自定义生成过程
@@ -1146,7 +1147,7 @@ class DynamicTemperatureAttacker:
             suffix_length = suffix_max_length,
             init_token = suffix_init_token,
         )
-        # print("init suffix token ids: ", init_suffix_token_ids)
+        print("init suffix token ids: ", init_suffix_token_ids)
 
         suffix_noise = torch.nn.Parameter(
             torch.zeros(size=(1, suffix_max_length, prompt_embeddings.shape[-1]), dtype=prompt_embeddings.dtype, device = self.local_llm_device),
@@ -1532,7 +1533,11 @@ class DynamicTemperatureAttacker:
                 max_length=response_length + prompt_length + suffix_max_length,
             )
 
+            # print("ref_responses: ", ref_responses)
+            
             # step 2. find the best reference response
+            
+            
             ref_response_texts = self.ref_local_llm_tokenizer.batch_decode(
                 ref_responses[:, prompt_length + suffix_max_length :],
                 skip_special_tokens=True,
@@ -1579,6 +1584,10 @@ class DynamicTemperatureAttacker:
                 .unsqueeze(0)
                 .to(self.local_llm_device)
             )  # target_response_ids.shape = (1, L)
+            
+            
+            
+            
             suffix_mask = None
             suffix_noise = torch.nn.Parameter(
                 torch.zeros_like(init_suffix_logits),
@@ -1759,26 +1768,55 @@ class DynamicTemperatureAttacker:
             # step 4. Test final suffix on ref model
             with torch.no_grad():
 
-                response = self.ref_generator(
-                    prompt + " " + suffix_tokens[0],
-                    max_length=prompt_length + suffix_max_length + response_length,
-                    do_sample=True,
-                    num_return_sequences=1,
+                # response = self.ref_generator(
+                #     prompt + " " + suffix_tokens[0],
+                #     max_length=prompt_length + suffix_max_length + response_length,
+                #     do_sample=True,
+                #     num_return_sequences=1,
+                #     temperature=0.7,
+                # )
+                # print("best response_text: ", response)
+                
+                # response_text = response[0]["generated_text"]
+                
+                # 1. 准备输入文本
+                input_text = prompt + " " + suffix_tokens[0]
+
+                # 2. 手动进行Tokenization
+                inputs = self.ref_local_llm_tokenizer(
+                    input_text, 
+                    return_tensors="pt"
+                ).to(self.ref_local_llm.device) # 确保输入在正确的设备上
+                inputs_ids = inputs.input_ids
+                
+                response = self.generate_ref_responses(
+                    model=self.ref_local_llm,
+                    tokenizer=self.ref_local_llm_tokenizer,
+                    input_ids = inputs_ids,
                     temperature=0.7,
+                    num_return_sequences=1,
+                    max_length=response_length + prompt_length + suffix_max_length,
                 )
-                print("best response_text: ", response)
+                
+                # 4. 手动解码，得到最终的文本
+                # 我们只解码新生成的部分，跳过输入的prompt
+                response_text = self.ref_local_llm_tokenizer.decode(
+                    response[0, inputs_ids.shape[1]:]
+                )
+                
+                print("best response_text: ", response_text)
             # step 4.1 Score response
             scores = self.judge_by_gptfuzzer(
                 model=self.judge_llm,
                 tokenizer=self.judge_llm_tokenizer,
-                response=response[0]["generated_text"],
+                response=response_text,
             )
             print("scores: ", scores)
             if scores[1] > best_unsafe_score:
                 best_suffix_token_ids = suffix_token_ids.detach()
                 best_suffix = suffix_tokens
                 # best_suffix_logits = suffix_logits.detach()
-                best_test_response = response
+                best_test_response = response_text
                 best_unsafe_score = scores[1]
                 best_iter_idx = i + 1
                 best_reference_response = best_ref_response,
@@ -1995,7 +2033,8 @@ class DynamicTemperatureAttacker:
                     "prompt": prompt,
                     "suffix": best_suffix_str,
                     "prompt_with_adv": prompt + best_suffix_str[0],
-                    "response": response[0]["generated_text"],
+                    # "response": response[0]["generated_text"],
+                    "response" : response,
                     "best_iter_idx": best_iter_idx,
                     "best_unsafe_score": best_unsafe_score,
                     "best_reference_response": best_reference_response,
@@ -2011,61 +2050,12 @@ class DynamicTemperatureAttacker:
 
 
 def attack_on_whole_dataset():
-    fn = "../data/raw/DNA_100.csv"
-    ############################# TEST 01 ##############################################
-    # attacker = DynamicTemperatureAttacker(
-    #     local_llm_device="cuda:1",
-    #     ref_local_llm_device="cuda:3",
-    #     judge_llm_device="cuda:2",
-    #     reference_model_infer_temperature = 1.0,
-    #     num_ref_infer_samples = 15,
-    # )
 
-    # save_path = "../data/results/res_advbench_100_custom.jsonl"
-    # results = attacker.attack(
-    #     target_fn=fn,
-    #     num_iters=20,
-    #     num_inner_iters=100,
-    #     learning_rate=1.5,
-    #     response_length=256,
-    #     forward_response_length=30,
-    #     suffix_max_length=20,
-    #     suffix_topk=10,
-    #     suffix_init_token="!",
-    #     verbose=True,
-    #     save_path=save_path,
-    # )
-    #####################################################################################
-
-    # ############################# TEST 02 ##############################################
-    # attacker = DynamicTemperatureAttacker(
-    #     local_llm_device="cuda:0",
-    #     ref_local_llm_device="cuda:2",
-    #     judge_llm_device="cuda:1",
-    #     reference_model_infer_temperature = 2.0,
-    #     num_ref_infer_samples = 15,
-    # )
-    # save_path = "../data/results/DyTA_res_advbench_100_custom_T2_S15_FRL40_NOI15_NII100.jsonl"
-    # results = attacker.attack(
-    #     target_fn=fn,
-    #     num_iters=15,
-    #     num_inner_iters=100,
-    #     learning_rate=1.5,
-    #     response_length=256,
-    #     forward_response_length=40,
-    #     suffix_max_length=20,
-    #     suffix_topk=10,
-    #     suffix_init_token="!",
-    #     verbose=True,
-    #     save_path=save_path,
-    # )
-    # #####################################################################################
-
-    ############################# TEST 03 ##############################################
-    fn = "../data/raw/advbench_100.csv"
-    # local_llm_model_name_or_path = "/hub/huggingface/models/meta-llama/Llama-2-7b-chat-hf"
-    local_llm_model_name_or_path = "/hub/huggingface/models/meta/llama-3-8B-Instruct"
-    local_model_name = "Llama3"
+    fn = "../data/raw/harmBench_100.csv"
+    local_llm_model_name_or_path = "/hub/huggingface/models/meta/Llama-2-7b-chat-hf"
+    local_model_name = "Llama2"
+    # local_llm_model_name_or_path = "/hub/huggingface/models/meta/Llama-3-8B-Instruct"
+    # local_model_name = "Llama3"
     # local_llm_model_name_or_path = "/hub/huggingface/models/Mistral-7B-Instruct-v0.3"
     # local_model_name = "Mistral-7b"
     local_llm_device = "cuda:1"
@@ -2073,8 +2063,8 @@ def attack_on_whole_dataset():
     judge_llm_device = "cuda:1"
     reference_model_infer_temperature = 2.0
     num_ref_infer_samples = 30
-    num_outer_iters = 2
-    num_inner_iters = 1500
+    num_outer_iters = 20
+    num_inner_iters = 10
     learning_rate = 1.5
     response_length = 256
     forward_response_length = 50 # 30 in default
@@ -2086,9 +2076,10 @@ def attack_on_whole_dataset():
 
     start_index = 0
     end_index = 100
-
+    version = "v2"
+    
     save_path = create_output_filename_and_path(
-        save_dir="../data/test_results/",
+        save_dir="../data/results/",
         inupt_filename=fn,
         attacker_name="DyTA",
         local_model_name=local_model_name,
@@ -2099,6 +2090,7 @@ def attack_on_whole_dataset():
         forward_response_length=forward_response_length,
         start_index = start_index, 
         end_index = end_index,
+        version = version,
     )
 
     attacker = DynamicTemperatureAttacker(
@@ -2140,8 +2132,8 @@ def attack_on_whole_dataset():
     )
     #####################################################################################
 
-    for i, result in enumerate(results):
-        print(f"Result {i}: {result}")
+    # for i, result in enumerate(results):
+    #     print(f"Result {i}: {result}")
 
 
 def attack_on_single_prompt_for_evaluation():
@@ -2267,8 +2259,8 @@ def test_suffix():
     suffix = [
         " business la!>\n826!(!ıldığı!useRalitos! ['аласяmamak63\"\nanta896Videos"
     ]
-    model_name = "/hub/huggingface/models/meta/llama-3-8B-Instruct"
-    model_device = "cuda:2"
+    model_name = "/hub/huggingface/models/meta/Llama-3-8B-Instruct"
+    model_device = "cuda:0"
 
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     model = AutoModelForCausalLM.from_pretrained(model_name).to(model_device)
@@ -2296,9 +2288,11 @@ def test_suffix():
     # print("response_text: ", response_text)
 
 
+
+
 if __name__ == "__main__":
     # test_optimize_single_prompt_with_suffix()
-    # test_suffix()
-    attack_on_whole_dataset()
+    test_suffix()
+    # attack_on_whole_dataset()
     # attack_on_single_prompt_for_evaluation()
     # test_optimize_single_prompt_with_suffix_in_double_loop()
