@@ -49,6 +49,8 @@ def _try_analyze(exp_name: str, path: str = None):
         from .analyze_exp_d import analyze
     elif exp_name == "E":
         from .analyze_exp_e import analyze
+    elif exp_name == "F":
+        from .analyze_exp_f import analyze
     else:
         print(f"[Error] Unknown experiment: {exp_name}")
         return False
@@ -68,9 +70,10 @@ def main():
     parser.add_argument("--exp-c", type=str, default=None, help="Path to Exp C jsonl")
     parser.add_argument("--exp-d", type=str, default=None, help="Path to Exp D jsonl")
     parser.add_argument("--exp-e", type=str, default=None, help="Path to Exp E jsonl")
+    parser.add_argument("--exp-f", type=str, default=None, help="Path to Exp F jsonl")
     args = parser.parse_args()
 
-    all_exps = ["A", "B", "C", "D", "E"]
+    all_exps = ["A", "B", "C", "D", "E", "F"]
     exps = args.experiments if args.experiments else all_exps
 
     path_map = {
@@ -79,6 +82,7 @@ def main():
         "C": args.exp_c,
         "D": args.exp_d,
         "E": args.exp_e,
+        "F": args.exp_f,
     }
 
     analysed = 0

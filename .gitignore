@@ -7,3 +7,4 @@ scripts/
 src/.env
 **/__pycache__/
 *.pyc
+llm-adaptive-attacks/
