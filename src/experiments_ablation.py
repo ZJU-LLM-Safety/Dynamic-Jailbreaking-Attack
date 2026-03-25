@@ -34,7 +34,7 @@ from attacker_v3 import (
 )
 from utils import create_output_filename_and_path, load_target_set
 
-PROJECT_ROOT = "/data/home/Kedong/repos/Dynamic-Target-Prompt-Attacker"
+PROJECT_ROOT = "/home/kedong/repos/Dynamic-Target-Prompt-Attacker"
 ADV_BENCH_PATH = os.path.join(PROJECT_ROOT, "data/raw/advbench_100.csv")
 DEFAULT_SAVE_DIR = os.path.join(PROJECT_ROOT, "data/DTA_ablation")
 
@@ -1973,7 +1973,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--judge-llm",
         type=str,
-        default="/hub/huggingface/models/hubert233/GPTFuzz",
+        default="/hub/huggingface/models/guardrail/GPTFuzz",
     )
     p.add_argument("--sample-count", type=int, default=30)
     p.add_argument("--ref-temperature", type=float, default=2.0)
