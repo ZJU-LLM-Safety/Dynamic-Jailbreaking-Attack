@@ -1340,6 +1340,7 @@ class AblationExperimenter(DynamicTemperatureAttacker):
         prompt: str,
         num_candidates: int = 100,
         num_buckets: int = 5,
+        selected_bucket: Optional[int] = None,
         num_iters: int = 10,
         num_inner_iters: int = 200,
         learning_rate: float = 0.00001,
@@ -1353,15 +1354,21 @@ class AblationExperimenter(DynamicTemperatureAttacker):
         """
         Density-stratified target ablation with multi-cycle outer loop.
 
+        Args:
+            selected_bucket: If set (0..num_buckets-1), only run optimization
+                for that single bucket.  Cycle-0 still samples all candidates
+                to establish boundaries, but only the chosen bucket is
+                optimised in the outer loop.  None (default) runs all buckets.
+
         Cycle 0:
           - Sample `num_candidates` candidates, score (judge + LL)
           - Sort by LL, establish bucket boundaries
-          - Each bucket picks the highest-harm target in its LL range
-          - Run inner-loop optimisation per bucket
+          - Each active bucket picks the highest-harm target in its LL range
+          - Run inner-loop optimisation per active bucket
 
         Cycles 1+:
-          - For each bucket, re-sample `num_ref_infer_samples` candidates
-            using that bucket's current suffix
+          - For each active bucket, re-sample `num_ref_infer_samples`
+            candidates using that bucket's current suffix
           - Filter to the bucket's LL range (from cycle 0)
           - Pick new highest-harm target
           - Continue inner-loop optimisation from previous suffix state
@@ -1400,9 +1407,21 @@ class AblationExperimenter(DynamicTemperatureAttacker):
             hi = lo + bucket_size if b < num_buckets - 1 else len(sorted_cands)
             cycle0_buckets.append(sorted_cands[lo:hi])
 
+        # ---- Determine which buckets to run ----
+        if selected_bucket is not None:
+            if selected_bucket < 0 or selected_bucket >= num_buckets:
+                raise ValueError(
+                    f"selected_bucket={selected_bucket} out of range "
+                    f"[0, {num_buckets})"
+                )
+            active_buckets = [selected_bucket]
+            print(f"  Single-bucket mode: only running bucket {selected_bucket}")
+        else:
+            active_buckets = list(range(num_buckets))
+
         # ---- Per-bucket state ----
         bucket_states: List[Dict] = []
-        for b_idx in range(num_buckets):
+        for b_idx in active_buckets:
             label = _bucket_label(b_idx, num_buckets)
             ll_min, ll_max = bucket_bounds[b_idx]
             bucket_cands = cycle0_buckets[b_idx]
@@ -1569,6 +1588,7 @@ class AblationExperimenter(DynamicTemperatureAttacker):
             "prompt": prompt,
             "num_candidates": num_candidates,
             "num_buckets": num_buckets,
+            "selected_bucket": selected_bucket,
             "num_iters": num_iters,
             "bucket_bounds": [list(b) for b in bucket_bounds],
             "bucket_results": bucket_results,
@@ -1580,6 +1600,7 @@ class AblationExperimenter(DynamicTemperatureAttacker):
         save_path: str,
         num_candidates: int = 100,
         num_buckets: int = 5,
+        selected_bucket: Optional[int] = None,
         start_index: int = 0,
         end_index: int = 100,
         **opt_kwargs,
@@ -1612,6 +1633,7 @@ class AblationExperimenter(DynamicTemperatureAttacker):
                     prompt=prompt,
                     num_candidates=num_candidates,
                     num_buckets=num_buckets,
+                    selected_bucket=selected_bucket,
                     **opt_kwargs,
                 )
 
@@ -1829,6 +1851,13 @@ def build_parser() -> argparse.ArgumentParser:
         default=5,
         help="(Exp C) Number of density buckets",
     )
+    p.add_argument(
+        "--selected-bucket",
+        type=int,
+        default=None,
+        help="(Exp C) Only run this single bucket index (0-based). "
+             "None = run all buckets.",
+    )
 
     # Experiment-D-specific
     p.add_argument(
@@ -1943,6 +1972,7 @@ def main():
             save_path=save_path,
             num_candidates=args.num_candidates,
             num_buckets=args.num_buckets,
+            selected_bucket=args.selected_bucket,
             start_index=args.start_index,
             end_index=args.end_index,
             **opt_kwargs,
