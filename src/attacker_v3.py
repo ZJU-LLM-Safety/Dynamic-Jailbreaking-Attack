@@ -161,7 +161,7 @@ REJ_WORDS = [
 ]
 
 
-ADV_BENCH_PATH = "../data/raw/advbench_100.csv"
+ADV_BENCH_PATH = "/home/kedong/repos/Dynamic-Target-Prompt-Attacker/data/raw/advbench_100.csv"
 MODEL_NAME_TO_PATH: Dict[str, str] = {
     "Llama3": "/hub/huggingface/models/meta/Llama-3-8B-Instruct",
     "Qwen2.5": "/hub/huggingface/models/Qwen/Qwen2.5-7B-Instruct",
@@ -196,7 +196,7 @@ class DynamicTemperatureAttacker:
         local_client_name: str = "llama3",
         local_llm_model_name_or_path: str = "/hub/huggingface/models/meta/llama-3-8B-Instruct", 
         local_llm_device: Optional[str] = "cuda:0", 
-        judge_llm_model_name_or_path: str = "/hub/huggingface/models/hubert233/GPTFuzz", 
+        judge_llm_model_name_or_path: str = "/hub/huggingface/models/guardrail/GPTFuzz", 
         judge_llm_device: Optional[str]  = "cuda:1",
         reference_client_name: Optional[str] = None,
         ref_local_llm_model_name_or_path: Optional[str] = None,
@@ -1463,7 +1463,7 @@ def attack_on_whole_dataset():
     reference_client_name = "HuggingFace"
     ref_model_name = "Gemma7b"
     ref_local_llm_model_name_or_path = get_model_path(ref_model_name)
-    judge_llm_model_name_or_path = "/hub/huggingface/models/hubert233/GPTFuzz"
+    judge_llm_model_name_or_path = "/hub/huggingface/models/guardrail/GPTFuzz"
 
     local_llm_device = "cuda:3"
     ref_local_llm_device = "cuda:2"
@@ -1487,7 +1487,7 @@ def attack_on_whole_dataset():
     version = "v1"
 
     save_path = create_output_filename_and_path(
-        save_dir="../data/DTA_transfer/",
+        save_dir="/home/kedong/repos/Dynamic-Target-Prompt-Attacker/data/DTA_transfer/",
         inupt_filename=fn,
         attacker_name="DTA",
         local_model_name=local_model_name,
@@ -1557,7 +1557,7 @@ def run_experiments_on_guard_as_judge():
     version = "v1_wildguard"
 
     save_path = create_output_filename_and_path(
-        save_dir="../data/DTA_ablation_on_judge_llm/",
+        save_dir="/home/kedong/repos/Dynamic-Target-Prompt-Attacker/data/DTA_ablation_on_judge_llm/",
         inupt_filename=fn,
         attacker_name="DTA",
         local_model_name=local_model_name,
