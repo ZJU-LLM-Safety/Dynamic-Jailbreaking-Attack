@@ -1086,8 +1086,8 @@ class DynamicTemperatureAttacker:
                     )
                     soft_suffix_logits = soft_suffix_logits / 0.001
 
-                if self.dtype == torch.float16:
-                    with torch.autocast(device_type="cuda", dtype=torch.float16):
+                if self.dtype in (torch.float16, torch.bfloat16):
+                    with torch.autocast(device_type="cuda", dtype=self.dtype):
                         pred_suffix_logits = self.soft_forward_suffix(
                             model=self.local_llm,
                             prompt_embeddings=prompt_embeddings,
@@ -1122,14 +1122,14 @@ class DynamicTemperatureAttacker:
                     [
                         prompt_embeddings,
                         torch.matmul(
-                            F.softmax(soft_suffix_logits_, dim=-1),
+                            F.softmax(soft_suffix_logits_, dim=-1).to(self.local_llm.get_input_embeddings().weight.dtype),
                             self.local_llm.get_input_embeddings().weight,
                         ),
                     ],
                     dim = 1
                 )
-                if self.dtype == torch.float16:
-                    with torch.autocast(device_type = "cuda", dtype = torch.float16):
+                if self.dtype in (torch.float16, torch.bfloat16):
+                    with torch.autocast(device_type = "cuda", dtype = self.dtype):
                         pred_resp_logits, tot_input_length = (
                             self.soft_model_forward_decoding(
                                 model=self.local_llm,
@@ -1224,7 +1224,7 @@ class DynamicTemperatureAttacker:
                 init_suffix_logits_ = init_suffix_logits_ + little_noise
 
             # After the inner loop, print suffix tokens
-            suffix_probs = F.softmax(suffix_logits, dim=-1).type(torch.float16)
+            suffix_probs = F.softmax(suffix_logits, dim=-1).to(self.dtype)
             suffix_token_ids = torch.argmax(
                 suffix_probs, dim=-1
             ).detach()
@@ -1275,13 +1275,14 @@ class DynamicTemperatureAttacker:
         prompt_embeddings,
         suffix_logits, 
     ):
-        suffix_probs = F.softmax(suffix_logits, dim = -1).type(torch.float16)
+        emb_weight = model.get_input_embeddings().weight
+        suffix_probs = F.softmax(suffix_logits, dim = -1).to(emb_weight.dtype)
 
         input_embeddings = torch.cat(
             [
                 prompt_embeddings,
                 torch.matmul(
-                    suffix_probs.float(), model.get_input_embeddings().weight
+                    suffix_probs, emb_weight
                 ).to(model.device)
             ],
             dim = 1
