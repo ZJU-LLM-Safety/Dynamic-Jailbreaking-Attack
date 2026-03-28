@@ -1261,7 +1261,7 @@ class DynamicTemperatureAttacker:
                 best_test_response = response_text
                 best_unsafe_score = scores[1]
                 best_iter_idx = i + 1
-                best_reference_response = best_ref_response,
+                best_reference_response = best_ref_response
                 best_reference_response_score = best_ref_response_score
                 if verbose:
                     print("best suffix tokens: ", best_suffix)

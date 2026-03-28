@@ -276,8 +276,9 @@ class HuggingFace:
         #     self.eos_token_ids.append(self.tokenizer.convert_tokens_to_ids("<|eot_id|>"))
         # self.pad_token_id = self.tokenizer.pad_token_id
         self.model = AutoModelForCausalLM.from_pretrained(
-            model_name,  
-        ).to(dtype)
+            model_name,
+            torch_dtype=dtype,
+        )
         self.model.to(device)
         self.model.eval()
         self.tokenizer = AutoTokenizer.from_pretrained(
