@@ -161,7 +161,11 @@ REJ_WORDS = [
 ]
 
 
-ADV_BENCH_PATH = "/home/kedong/repos/Dynamic-Target-Prompt-Attacker/data/raw/advbench_100.csv"
+ADV_BENCH_PATH = "/data/home/Kedong/repos/Dynamic-Target-Prompt-Attacker/data/raw/advbench_100.csv"
+
+HARM_BENCH_PATH = "/data/home/Kedong/repos/Dynamic-Target-Prompt-Attacker/data/raw/harmBench_100.csv"
+
+
 MODEL_NAME_TO_PATH: Dict[str, str] = {
     "Llama3": "/hub/huggingface/models/meta/Llama-3-8B-Instruct",
     "Qwen2.5": "/hub/huggingface/models/Qwen/Qwen2.5-7B-Instruct",
@@ -196,7 +200,7 @@ class DynamicTemperatureAttacker:
         local_client_name: str = "llama3",
         local_llm_model_name_or_path: str = "/hub/huggingface/models/meta/llama-3-8B-Instruct", 
         local_llm_device: Optional[str] = "cuda:0", 
-        judge_llm_model_name_or_path: str = "/hub/huggingface/models/guardrail/GPTFuzz", 
+        judge_llm_model_name_or_path: str = "/hub/huggingface/models/hubert233/GPTFuzz", 
         judge_llm_device: Optional[str]  = "cuda:1",
         reference_client_name: Optional[str] = None,
         ref_local_llm_model_name_or_path: Optional[str] = None,
@@ -207,6 +211,7 @@ class DynamicTemperatureAttacker:
         reference_model_infer_temperature: float = 1.0,
         num_ref_infer_samples: int = 30,
     ):
+        self.local_client_name = local_client_name
         self.local_llm_model_name_or_path = local_llm_model_name_or_path
         self.local_llm_device = local_llm_device if local_llm_device is not None else "cpu"
         self.judge_llm_model_name_or_path = judge_llm_model_name_or_path
@@ -1359,12 +1364,14 @@ class DynamicTemperatureAttacker:
         zero = torch.tensor(0.0).to(decoder_outputs.device)
         target_expand = target_idx.view(batch_size,1,1,-1).expand(-1,-1,output_len,-1)
         out = torch.where(target_expand==pad, zero, out)
+        out_dtype = out.dtype
         ############################
         for cnt, ngram in enumerate(ngram_list):
             if ngram > output_len:
                 continue
             eye_filter = torch.eye(ngram).view([1, 1, ngram, ngram]).to(decoder_outputs.device)
-            term = nn.functional.conv2d(out, eye_filter)/ngram
+            term = nn.functional.conv2d(out.float(), eye_filter)/ngram
+            term.to(out_dtype)
             if ngram < decoder_outputs.size()[1]:
                 term = term.squeeze(1)
                 gum_tmp = F.gumbel_softmax(term, tau=1, dim=1)
@@ -1463,7 +1470,7 @@ def attack_on_whole_dataset():
     reference_client_name = "HuggingFace"
     ref_model_name = "Gemma7b"
     ref_local_llm_model_name_or_path = get_model_path(ref_model_name)
-    judge_llm_model_name_or_path = "/hub/huggingface/models/guardrail/GPTFuzz"
+    judge_llm_model_name_or_path = "/hub/huggingface/models/hubert233/GPTFuzz"
 
     local_llm_device = "cuda:3"
     ref_local_llm_device = "cuda:2"
@@ -1487,7 +1494,7 @@ def attack_on_whole_dataset():
     version = "v1"
 
     save_path = create_output_filename_and_path(
-        save_dir="/home/kedong/repos/Dynamic-Target-Prompt-Attacker/data/DTA_transfer/",
+        save_dir="/data/home/Kedong/repos/Dynamic-Target-Prompt-Attacker/data/DTA_transfer/",
         inupt_filename=fn,
         attacker_name="DTA",
         local_model_name=local_model_name,
@@ -1557,7 +1564,7 @@ def run_experiments_on_guard_as_judge():
     version = "v1_wildguard"
 
     save_path = create_output_filename_and_path(
-        save_dir="/home/kedong/repos/Dynamic-Target-Prompt-Attacker/data/DTA_ablation_on_judge_llm/",
+        save_dir="/data/home/Kedong/repos/Dynamic-Target-Prompt-Attacker/data/DTA_ablation_on_judge_llm/",
         inupt_filename=fn,
         attacker_name="DTA",
         local_model_name=local_model_name,

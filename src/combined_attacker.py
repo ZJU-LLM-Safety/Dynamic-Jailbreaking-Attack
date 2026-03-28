@@ -33,6 +33,7 @@ from tqdm import tqdm
 
 from attacker_v3 import (
     ADV_BENCH_PATH,
+    HARM_BENCH_PATH,
     MODEL_NAME_TO_PATH,
     REJ_WORDS,
     DynamicTemperatureAttacker,
@@ -632,11 +633,12 @@ class CombinedAttacker(DynamicTemperatureAttacker):
             return {"error": "openai not installed"}
 
         api_key = os.getenv("OPENAI_API_KEY")
+        base_url = os.getenv("OPENAI_BASE")
         if not api_key:
             print("[Transfer] OPENAI_API_KEY not set. Skipping.")
             return {"error": "OPENAI_API_KEY not set"}
 
-        api_client = OpenAI(api_key=api_key)
+        api_client = OpenAI(api_key=api_key,base_url=base_url)
 
         transfer_rs = RandomSearchModule(
             model=None,
@@ -976,10 +978,19 @@ def main():
     parser.add_argument(
         "--data-path", type=str, default=ADV_BENCH_PATH
     )
-    parser.add_argument("--save-dir", type=str, default="../data/combined/")
+    parser.add_argument("--save-dir", type=str, default="/data/home/Kedong/repos/Dynamic-Target-Prompt-Attacker/data/combined/")
 
     args = parser.parse_args()
 
+    # modify save-dir based on data-path
+    if args.data_path == ADV_BENCH_PATH:
+        args.save_dir = os.path.join(args.save_dir, "advbench")
+    elif args.data_path == HARM_BENCH_PATH:
+        args.save_dir = os.path.join(args.save_dir, "harmbench")
+    else:
+        raise ValueError(f"Invalid data path: {args.data_path}")
+    
+    
     # Build config
     dtype_map = {
         "float16": torch.float16,
