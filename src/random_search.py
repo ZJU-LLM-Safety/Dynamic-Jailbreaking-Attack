@@ -77,6 +77,8 @@ class RandomSearchModule:
         # API mode
         self.api_client = api_client
         self.api_model_name = api_model_name
+        self.api_supports_logprobs = True
+        self._warned_logprobs_fallback = False
 
         # Derive vocab size
         if tokenizer is not None:
@@ -146,21 +148,49 @@ class RandomSearchModule:
         """Extract logprob via an OpenAI-compatible API (top_logprobs=20)."""
         for attempt in range(5):
             try:
-                response = self.api_client.chat.completions.create(
-                    model=self.api_model_name,
-                    messages=[{"role": "user", "content": full_prompt}],
-                    max_tokens=1,
-                    temperature=0,
-                    logprobs=True,
-                    top_logprobs=20,
-                    seed=0,
+                if self.api_supports_logprobs:
+                    response = self.api_client.chat.completions.create(
+                        model=self.api_model_name,
+                        messages=[{"role": "user", "content": full_prompt}],
+                        max_tokens=1,
+                        temperature=0,
+                        logprobs=True,
+                        top_logprobs=20,
+                        seed=0,
+                    )
+                    logprob_content = response.choices[0].logprobs.content
+                    if not logprob_content:
+                        raise ValueError("API returned empty logprobs content.")
+                    logprob_dict = {
+                        lp.token: lp.logprob
+                        for lp in logprob_content[0].top_logprobs
+                    }
+                    return _extract_logprob_from_dict(logprob_dict, target_token)
+
+                return self._extract_logprob_api_without_logprobs(
+                    full_prompt=full_prompt,
+                    target_text=target_token,
+                    max_tokens=max(
+                        4,
+                        len(
+                            self.tokenizer.encode(
+                                " " + target_token,
+                                add_special_tokens=False,
+                            )
+                        )
+                        + 2,
+                    ),
                 )
-                logprob_dict = {
-                    lp.token: lp.logprob
-                    for lp in response.choices[0].logprobs.content[0].top_logprobs
-                }
-                return _extract_logprob_from_dict(logprob_dict, target_token)
             except Exception as e:
+                if _api_error_indicates_unsupported_logprobs(e):
+                    self.api_supports_logprobs = False
+                    if not self._warned_logprobs_fallback:
+                        print(
+                            "[RS] API provider does not support logprobs; "
+                            "falling back to text-prefix scoring."
+                        )
+                        self._warned_logprobs_fallback = True
+                    continue
                 print(f"API error (attempt {attempt + 1}): {e}")
                 time.sleep(10)
         return -np.inf
@@ -216,26 +246,69 @@ class RandomSearchModule:
         n_target = len(target_token_ids)
         for attempt in range(5):
             try:
-                response = self.api_client.chat.completions.create(
-                    model=self.api_model_name,
-                    messages=[{"role": "user", "content": full_prompt}],
-                    max_tokens=n_target,
-                    temperature=0,
-                    logprobs=True,
-                    top_logprobs=20,
-                    seed=0,
+                if self.api_supports_logprobs:
+                    response = self.api_client.chat.completions.create(
+                        model=self.api_model_name,
+                        messages=[{"role": "user", "content": full_prompt}],
+                        max_tokens=n_target,
+                        temperature=0,
+                        logprobs=True,
+                        top_logprobs=20,
+                        seed=0,
+                    )
+                    total = 0.0
+                    content_logprobs = response.choices[0].logprobs.content
+                    n_valid = min(len(content_logprobs), n_target)
+                    for i in range(n_valid):
+                        token_lp = content_logprobs[i].logprob
+                        total += token_lp
+                    return total / max(n_valid, 1)
+
+                return self._extract_logprob_api_without_logprobs(
+                    full_prompt=full_prompt,
+                    target_text=self.tokenizer.decode(target_token_ids),
+                    max_tokens=max(n_target, 8),
                 )
-                total = 0.0
-                content_logprobs = response.choices[0].logprobs.content
-                n_valid = min(len(content_logprobs), n_target)
-                for i in range(n_valid):
-                    token_lp = content_logprobs[i].logprob
-                    total += token_lp
-                return total / max(n_valid, 1)
             except Exception as e:
+                if _api_error_indicates_unsupported_logprobs(e):
+                    self.api_supports_logprobs = False
+                    if not self._warned_logprobs_fallback:
+                        print(
+                            "[RS] API provider does not support logprobs; "
+                            "falling back to text-prefix scoring."
+                        )
+                        self._warned_logprobs_fallback = True
+                    continue
                 print(f"API error (attempt {attempt + 1}): {e}")
                 time.sleep(10)
         return -np.inf
+
+    def _extract_logprob_api_without_logprobs(
+        self,
+        full_prompt: str,
+        target_text: str,
+        max_tokens: int,
+    ) -> float:
+        """
+        Approximate first-token probability when the provider exposes no logprobs.
+
+        We greedily generate a short continuation and score how much of the
+        desired prefix appears at the start of the response. The returned value
+        is a pseudo-logprob in ``(-inf, 0]`` so the existing RS schedule and
+        early-stop logic can keep working.
+        """
+        response = self.api_client.chat.completions.create(
+            model=self.api_model_name,
+            messages=[{"role": "user", "content": full_prompt}],
+            max_tokens=max_tokens,
+            temperature=0,
+            seed=0,
+        )
+        generated_text = response.choices[0].message.content or ""
+        return _approximate_logprob_from_text_prefix(
+            generated_text=generated_text,
+            target_text=target_text,
+        )
 
     # ------------------------------------------------------------------
     # Core Random Search
@@ -482,3 +555,69 @@ def _extract_logprob_from_dict(
     if target_token in logprob_dict:
         candidates.append(logprob_dict[target_token])
     return max(candidates) if candidates else -np.inf
+
+
+def _api_error_indicates_unsupported_logprobs(exc: Exception) -> bool:
+    message = str(exc).lower()
+    if "logprobs" not in message and "top_logprobs" not in message:
+        return False
+    unsupported_markers = [
+        "unexpected keyword argument",
+        "unsupported",
+        "not support",
+        "unknown parameter",
+        "extra inputs are not permitted",
+        "extra_forbidden",
+        "unrecognized",
+        "invalid parameter",
+    ]
+    return any(marker in message for marker in unsupported_markers)
+
+
+def _approximate_logprob_from_text_prefix(
+    generated_text: str,
+    target_text: str,
+) -> float:
+    """
+    Convert prefix overlap into a pseudo-logprob.
+
+    Exact prefix match maps to ``0.0`` (probability 1). Partial matches map
+    to ``log(prefix_ratio)`` so the existing RS code can still interpret the
+    score through ``exp(score)``.
+    """
+    generated = (generated_text or "").lstrip()
+    target = (target_text or "").lstrip()
+    if not target:
+        return -np.inf
+
+    candidate_targets = [target]
+    lowered = target.lower()
+    if lowered != target:
+        candidate_targets.append(lowered)
+
+    best_ratio = 0.0
+    generated_lower = generated.lower()
+    for candidate in candidate_targets:
+        best_ratio = max(best_ratio, _prefix_match_ratio(generated, candidate))
+        if generated_lower != generated:
+            best_ratio = max(
+                best_ratio,
+                _prefix_match_ratio(generated_lower, candidate.lower()),
+            )
+
+    if best_ratio <= 0:
+        return -np.inf
+    return float(np.log(best_ratio))
+
+
+def _prefix_match_ratio(text: str, prefix: str) -> float:
+    if not text or not prefix:
+        return 0.0
+    if text.startswith(prefix):
+        return 1.0
+
+    match_len = 0
+    max_len = min(len(text), len(prefix))
+    while match_len < max_len and text[match_len] == prefix[match_len]:
+        match_len += 1
+    return match_len / len(prefix)

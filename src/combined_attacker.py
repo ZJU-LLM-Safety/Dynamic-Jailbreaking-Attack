@@ -40,13 +40,26 @@ from attacker_v3 import (
     get_model_path,
     load_attack_targets_from_csv,
 )
+from openai_compat import build_openai_client
 from prompt_templates import apply_prompt_template, load_goals_and_targets
 from random_search import RandomSearchModule
+from dotenv import load_dotenv
 
+load_dotenv()
 
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
+
+
+def resolve_openai_api_base(api_base: Optional[str] = None) -> Optional[str]:
+    """Resolve API base URL from CLI override or supported environment names."""
+    return api_base or os.getenv("OPENAI_API_BASE") or os.getenv("OPENAI_BASE")
+
+
+def resolve_openai_api_key(api_key: Optional[str] = None) -> Optional[str]:
+    """Resolve API key from CLI override or environment."""
+    return api_key or os.getenv("OPENAI_API_KEY")
 
 
 @dataclass
@@ -623,7 +636,7 @@ class CombinedAttacker(DynamicTemperatureAttacker):
         Transfer attack: fine-tune the DTA suffix on an API model using RS.
         """
         try:
-            from openai import OpenAI
+            import openai  # noqa: F401
         except ImportError:
             print(
                 "[Transfer] openai package not installed. "
@@ -631,13 +644,13 @@ class CombinedAttacker(DynamicTemperatureAttacker):
             )
             return {"error": "openai not installed"}
 
-        api_key = os.getenv("OPENAI_API_KEY")
-        base_url = os.getenv("OPENAI_BASE")
+        api_key = resolve_openai_api_key()
+        base_url = resolve_openai_api_base()
         if not api_key:
             print("[Transfer] OPENAI_API_KEY not set. Skipping.")
             return {"error": "OPENAI_API_KEY not set"}
 
-        api_client = OpenAI(api_key=api_key,base_url=base_url)
+        api_client = build_openai_client(api_key=api_key, base_url=base_url)
 
         transfer_rs = RandomSearchModule(
             model=None,
@@ -985,8 +998,9 @@ class DirectAPIAttacker:
       Phase 2: run RS directly on the target API using logprobs (Strategy 2)
       Phase 3: generate full response and judge jailbreak success
 
-    Requires ``OPENAI_API_KEY`` (and optionally ``OPENAI_BASE``) to be set
-    as environment variables.
+    Requires ``OPENAI_API_KEY`` and optionally ``OPENAI_API_BASE`` or
+    ``OPENAI_BASE`` to be set as environment variables, or provided via
+    CLI overrides.
     """
 
     def __init__(
@@ -994,16 +1008,14 @@ class DirectAPIAttacker:
         api_model_name: str,
         config: DirectAPIConfig,
     ):
-        from openai import OpenAI
-
         self.config = config
         self.api_model_name = api_model_name
 
-        api_key = os.getenv("OPENAI_API_KEY")
-        base_url = os.getenv("OPENAI_BASE")
+        api_key = resolve_openai_api_key()
+        base_url = resolve_openai_api_base()
         if not api_key:
             raise EnvironmentError("OPENAI_API_KEY is not set.")
-        self.api_client = OpenAI(api_key=api_key, base_url=base_url)
+        self.api_client = build_openai_client(api_key=api_key, base_url=base_url)
 
         # Tokenizer for RS token mutation
         self.tokenizer = TiktokenWrapper(model_name=api_model_name)
@@ -1211,6 +1223,21 @@ def main():
         "--api-model", type=str, default="gpt-3.5-turbo",
         help="Target API model for direct-api mode (e.g. gpt-3.5-turbo, gpt-4o)",
     )
+    parser.add_argument(
+        "--api-base",
+        type=str,
+        default=None,
+        help=(
+            "Override API base URL for direct-api mode and transfer attacks. "
+            "Falls back to OPENAI_API_BASE, then OPENAI_BASE."
+        ),
+    )
+    parser.add_argument(
+        "--api-key",
+        type=str,
+        default=None,
+        help="Override API key for direct-api mode and transfer attacks.",
+    )
     parser.add_argument("--use-gpt4-judge", action="store_true", default=False)
     parser.add_argument("--judge-model", type=str, default="gpt-4o")
 
@@ -1251,6 +1278,12 @@ def main():
                         default="/data/home/Kedong/repos/Dynamic-Target-Prompt-Attacker/data/combined/")
 
     args = parser.parse_args()
+
+    if args.api_base:
+        os.environ["OPENAI_API_BASE"] = args.api_base
+        os.environ["OPENAI_BASE"] = args.api_base
+    if args.api_key:
+        os.environ["OPENAI_API_KEY"] = args.api_key
 
     # Resolve save-dir sub-folder based on dataset
     if args.data_path == ADV_BENCH_PATH:
