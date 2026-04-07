@@ -312,6 +312,20 @@ class HuggingFace:
         )
         self.device = device
         self.dtype = dtype
+
+        # ---- Detect reasoning models with <think> output ----
+        # Qwen3 / DeepSeek-R1 / etc. emit "<think>...</think>" before the
+        # actual response.  We strip these in post-processing so the judge
+        # sees only the final answer.
+        name_lower = model_name.lower()
+        self._is_reasoning_model = (
+            "qwen3" in name_lower
+            or "deepseek-r1" in name_lower
+            or "/r1-" in name_lower
+        )
+        if self._is_reasoning_model:
+            print(f"[HuggingFace] Detected reasoning model: {model_name}")
+            print(f"[HuggingFace] Will strip <think>...</think> from outputs")
         
 
     @torch.no_grad()
@@ -346,7 +360,21 @@ class HuggingFace:
             outputs[:, input_len:],
             skip_special_tokens = True,
         )
+        # Strip reasoning <think>...</think> blocks for reasoning models
+        if self._is_reasoning_model:
+            responses = [self._strip_think(r) for r in responses]
         return responses
+
+    @staticmethod
+    def _strip_think(text: str) -> str:
+        """Remove <think>...</think> reasoning blocks from a response."""
+        import re
+        # Greedy strip: remove everything up to and including the last </think>
+        cleaned = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
+        # Also handle truncated/dangling open tag
+        if "<think>" in cleaned and "</think>" not in cleaned:
+            cleaned = re.sub(r"<think>.*$", "", cleaned, flags=re.DOTALL)
+        return cleaned.strip()
         
         
     @torch.no_grad()
