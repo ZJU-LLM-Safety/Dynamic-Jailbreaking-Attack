@@ -22,7 +22,6 @@ Usage:
     )
 """
 
-import os
 import random
 import time
 from typing import Callable, Dict, List, Optional, Tuple
@@ -380,32 +379,39 @@ class RandomSearchModule:
         token_ids: List[int],
         vocab_size: int,
         suffix_max_length: int,
+        peak_value: float = 5.0,
     ) -> torch.Tensor:
         """
-        Convert a token ID sequence (from RS) into sharply peaked logits
+        Convert a token ID sequence (from RS) into **smooth** logits
         suitable for DTA suffix initialisation.
 
+        Instead of hard one-hot (which causes gradient saturation in DTA),
+        this produces a soft distribution centred on the RS-found tokens
+        with a controllable ``peak_value``.  The background is small
+        Gaussian noise so that the DTA gradient optimiser can explore
+        neighbouring tokens.
+
+        Args:
+            token_ids: Token IDs from the RS phase.
+            vocab_size: Vocabulary size of the model.
+            suffix_max_length: Target suffix length for DTA.
+            peak_value: Logit value at the RS-found token.  Background
+                noise has std ≈ 1.0.  A ``peak_value`` of 5.0 gives the
+                RS token ~99 % of the softmax mass while keeping gradients
+                alive for nearby tokens.
+
         Returns:
-            Tensor of shape ``(1, suffix_max_length, vocab_size)`` with
-            ``0.0`` at the target positions and ``-1e10`` elsewhere.
+            Tensor of shape ``(1, suffix_max_length, vocab_size)``.
         """
-        # Truncate or pad
         ids = list(token_ids[:suffix_max_length])
 
-        logits = torch.full(
-            (1, suffix_max_length, vocab_size),
-            -1e10,
-            dtype=torch.float32,
-        )
+        # Start from small Gaussian noise (like model output logits)
+        logits = torch.randn(1, suffix_max_length, vocab_size) * 1.0
+
+        # Boost the RS-found tokens
         for i, tid in enumerate(ids):
             if 0 <= tid < vocab_size:
-                logits[0, i, tid] = 0.0
-
-        # If fewer tokens than suffix_max_length, fill remaining positions
-        # with small uniform noise so DTA can explore.
-        if len(ids) < suffix_max_length:
-            for i in range(len(ids), suffix_max_length):
-                logits[0, i, :] = torch.randn(vocab_size) * 0.01
+                logits[0, i, tid] = peak_value
 
         return logits
 

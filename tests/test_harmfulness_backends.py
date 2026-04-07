@@ -55,6 +55,44 @@ class TestOpenAICompatibleBackend(unittest.TestCase):
         self.assertEqual(output, "judge-result")
         mock_client.chat.completions.create.assert_called_once()
 
+    def test_generate_retries_with_max_tokens_after_generic_bad_request(self):
+        response = SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content="judge-result"))]
+        )
+
+        class GenericBadRequest(Exception):
+            status_code = 400
+
+            def __str__(self):
+                return (
+                    "Error code: 400 - {'error': {'message': '', "
+                    "'localized_message': '', 'type': '<nil>', "
+                    "'param': '', 'code': None}}"
+                )
+
+        mock_client = MagicMock()
+        mock_client.chat.completions.create.side_effect = [
+            GenericBadRequest(),
+            response,
+        ]
+
+        settings = ApiBackendSettings(
+            provider="openai",
+            model_name="gpt-test",
+            api_key="secret",
+            base_url="https://example.com/v1",
+        )
+        backend = OpenAICompatibleBackend(settings=settings, client=mock_client)
+
+        output = backend.generate("hello", options=GenerationOptions(max_new_tokens=32))
+
+        self.assertEqual(output, "judge-result")
+        self.assertEqual(mock_client.chat.completions.create.call_count, 2)
+        first_call = mock_client.chat.completions.create.call_args_list[0]
+        second_call = mock_client.chat.completions.create.call_args_list[1]
+        self.assertEqual(first_call.kwargs["max_completion_tokens"], 32)
+        self.assertEqual(second_call.kwargs["max_tokens"], 32)
+
     @patch("src.eval.harmfulness.backends.load_api_backend_settings")
     def test_from_env_uses_config_loader(self, mock_loader):
         mock_loader.return_value = ApiBackendSettings(

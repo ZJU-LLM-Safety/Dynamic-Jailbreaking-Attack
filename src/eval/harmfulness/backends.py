@@ -73,6 +73,7 @@ class OpenAICompatibleBackend(BaseGenerationBackend):
         default_options: Optional[GenerationOptions] = None,
     ):
         self.settings = settings
+        # print("base_url: ", settings.base_url)
         self.client = client or OpenAI(
             api_key=settings.api_key,
             base_url=settings.base_url,
@@ -110,15 +111,70 @@ class OpenAICompatibleBackend(BaseGenerationBackend):
         options: Optional[GenerationOptions] = None,
     ) -> str:
         options = options or self.default_options
-        response = self.client.chat.completions.create(
-            model=self.settings.model_name,
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=options.max_new_tokens,
-            temperature=options.temperature,
-            top_p=options.top_p,
-            n=1,
-            timeout=self.settings.timeout,
-        )
+        # OpenAI-compatible providers disagree on whether chat completions accept
+        # `max_completion_tokens` or the older `max_tokens`, and some proxies
+        # return a generic 400 instead of naming the unsupported field. Clamp the
+        # value, try both spellings, and keep the long-prompt retry below.
+        max_tokens = max(1, int(options.max_new_tokens))
+
+        def _create_completion(user_prompt: str):
+            base_kwargs = dict(
+                model=self.settings.model_name,
+                messages=[{"role": "user", "content": user_prompt}],
+                temperature=options.temperature,
+                timeout=self.settings.timeout,
+            )
+            if options.temperature > 0.0:
+                base_kwargs["top_p"] = options.top_p
+            attempts = [
+                dict(base_kwargs, max_completion_tokens=max_tokens),
+                dict(base_kwargs, max_tokens=max_tokens),
+            ]
+
+            last_exc = None
+            for request_kwargs in attempts:
+                try:
+                    return self.client.chat.completions.create(**request_kwargs)
+                except Exception as exc:
+                    last_exc = exc
+                    text = str(exc)
+                    status_code = getattr(exc, "status_code", None)
+                    # Provider doesn't accept sending both fields together.
+                    if "max_tokens" in request_kwargs and (
+                        "max_tokens' and 'max_completion_tokens'" in text
+                        or "invalid_parameter_combination" in text
+                    ):
+                        continue
+                    # SDK/provider may not support this specific token field.
+                    if (
+                        "max_completion_tokens" in request_kwargs
+                        and (
+                            isinstance(exc, TypeError)
+                            or status_code == 400
+                            or "unknown parameter" in text.lower()
+                            or "unrecognized request argument" in text.lower()
+                        )
+                    ):
+                        continue
+                    raise
+            if last_exc is not None:
+                raise last_exc
+            raise RuntimeError("Failed to create completion with available token fields.")
+
+        try:
+            response = _create_completion(prompt)
+        except Exception as exc:
+            text = str(exc)
+            should_retry = (
+                "max_completion_tokens" in text
+                and "integer below minimum value" in text
+            )
+            if not should_retry:
+                raise
+
+            truncated_prompt = prompt[-12000:] if len(prompt) > 12000 else prompt
+            response = _create_completion(truncated_prompt)
+
         content = response.choices[0].message.content
         return content or ""
 
