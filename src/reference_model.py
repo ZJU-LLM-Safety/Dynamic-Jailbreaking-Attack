@@ -2,17 +2,29 @@
 # Wrap reference model class
 
 import openai
-from openai import OpenAI
-import anthropic
 import os
 import time
 import torch
 import gc
-import tiktoken
 from typing import Dict, List
 from transformers import AutoModelForCausalLM, AutoTokenizer, RobertaForSequenceClassification, RobertaTokenizer, pipeline, GenerationConfig
 from dotenv import load_dotenv
-import together
+from openai_compat import build_openai_client
+
+try:
+    import tiktoken
+except ImportError:
+    tiktoken = None
+
+try:
+    import anthropic  # noqa: F401
+except ImportError:
+    anthropic = None
+
+try:
+    import together
+except ImportError:
+    together = None
 
 
 
@@ -34,13 +46,20 @@ class GPT:
         self.model_name = model_name
         self.client_name = client_name
         if 'openai' in client_name or 'gpt' in client_name:
-            self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"), base_url = os.getenv("OPENAI_API_BASE"))
+            self.client = build_openai_client(
+                api_key=os.getenv("OPENAI_API_KEY"),
+                base_url=os.getenv("OPENAI_API_BASE"),
+            )
         elif "dashscope" in client_name:
-            self.client = OpenAI(
-                api_key = os.getenv("DASHSCOPE_API_KEY"),
-                base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1",
+            self.client = build_openai_client(
+                api_key=os.getenv("DASHSCOPE_API_KEY"),
+                base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
             )
         elif 'together' in client_name:
+            if together is None:
+                raise ImportError(
+                    "together package is required for Together API references."
+                )
             # TOGETHER_API_KEY = os.environ.get("TOGETHER_API_KEY")
             # # self.client = OpenAI(api_key=TOGETHER_API_KEY, base_url='https://api.together.xyz')
             # # self.client = together.Together(api_key=TOGETHER_API_KEY, base_url='https://api.together.xyz')
@@ -48,8 +67,12 @@ class GPT:
             self.client = together.Together()
         else:
             raise ValueError(f"Unknown client name: {client_name}")
-        self.tokenizer = tiktoken.encoding_for_model("gpt-4")  # same as for gpt-3.5     
-        self.tokenizer.vocab_size = 100256  # note values from 100256 to 100275 (tokenizer.max_token_value) throw an error   
+        if tiktoken is not None:
+            self.tokenizer = tiktoken.encoding_for_model("gpt-4")
+            # Values above 100255 can error on direct decode in some versions.
+            self.tokenizer.vocab_size = 100256
+        else:
+            self.tokenizer = None
 
     def generate(
         self,
@@ -125,6 +148,7 @@ class GPT:
                     
                     for choice in response.choices:
                         output.append(choice.message.content)
+                    break
                 except openai.OpenAIError as e:
                     print(type(e), e)
                     time.sleep(self.API_RETRY_SLEEP)
@@ -162,6 +186,7 @@ class GPT:
                     # print("response in dashscope: ", response)
                     for choice in response.choices:
                         output.append(choice.message.content)
+                    break
                 except openai.OpenAIError as e:
                     print(type(e), e)
                     time.sleep(self.API_RETRY_SLEEP)
@@ -199,6 +224,7 @@ class GPT:
                     
                     for choice in response.choices:
                         output.append(choice.message.content)
+                    break
                 except openai.OpenAIError as e:
                     print(type(e), e)
                     time.sleep(self.API_RETRY_SLEEP)
@@ -276,8 +302,9 @@ class HuggingFace:
         #     self.eos_token_ids.append(self.tokenizer.convert_tokens_to_ids("<|eot_id|>"))
         # self.pad_token_id = self.tokenizer.pad_token_id
         self.model = AutoModelForCausalLM.from_pretrained(
-            model_name,  
-        ).to(dtype)
+            model_name,
+            torch_dtype=dtype,
+        )
         self.model.to(device)
         self.model.eval()
         self.tokenizer = AutoTokenizer.from_pretrained(
@@ -285,6 +312,20 @@ class HuggingFace:
         )
         self.device = device
         self.dtype = dtype
+
+        # ---- Detect reasoning models with <think> output ----
+        # Qwen3 / DeepSeek-R1 / etc. emit "<think>...</think>" before the
+        # actual response.  We strip these in post-processing so the judge
+        # sees only the final answer.
+        name_lower = model_name.lower()
+        self._is_reasoning_model = (
+            "qwen3" in name_lower
+            or "deepseek-r1" in name_lower
+            or "/r1-" in name_lower
+        )
+        if self._is_reasoning_model:
+            print(f"[HuggingFace] Detected reasoning model: {model_name}")
+            print(f"[HuggingFace] Will strip <think>...</think> from outputs")
         
 
     @torch.no_grad()
@@ -319,7 +360,21 @@ class HuggingFace:
             outputs[:, input_len:],
             skip_special_tokens = True,
         )
+        # Strip reasoning <think>...</think> blocks for reasoning models
+        if self._is_reasoning_model:
+            responses = [self._strip_think(r) for r in responses]
         return responses
+
+    @staticmethod
+    def _strip_think(text: str) -> str:
+        """Remove <think>...</think> reasoning blocks from a response."""
+        import re
+        # Greedy strip: remove everything up to and including the last </think>
+        cleaned = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
+        # Also handle truncated/dangling open tag
+        if "<think>" in cleaned and "</think>" not in cleaned:
+            cleaned = re.sub(r"<think>.*$", "", cleaned, flags=re.DOTALL)
+        return cleaned.strip()
         
         
     @torch.no_grad()
