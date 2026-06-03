@@ -6,7 +6,7 @@ import os
 import time
 import torch
 import gc
-from typing import Dict, List
+from typing import Dict, List, Optional
 from transformers import AutoModelForCausalLM, AutoTokenizer, RobertaForSequenceClassification, RobertaTokenizer, pipeline, GenerationConfig
 from dotenv import load_dotenv
 from openai_compat import build_openai_client
@@ -304,6 +304,7 @@ class HuggingFace:
         self.model = AutoModelForCausalLM.from_pretrained(
             model_name,
             torch_dtype=dtype,
+            low_cpu_mem_usage=True,
         )
         self.model.to(device)
         self.model.eval()
@@ -404,6 +405,75 @@ class HuggingFace:
         )
 
         return outputs
+
+
+def _resolve_vllm_dtype(dtype: torch.dtype) -> str:
+    if dtype == torch.bfloat16:
+        return "bfloat16"
+    if dtype == torch.float16:
+        return "float16"
+    if dtype == torch.float32 or dtype == torch.float:
+        return "float32"
+    return "auto"
+
+
+class VLLMReference:
+    def __init__(
+        self,
+        model_name,
+        dtype=torch.float,
+        tensor_parallel_size: int = 1,
+        gpu_memory_utilization: float = 0.9,
+        max_model_len: Optional[int] = None,
+    ):
+        try:
+            from vllm import LLM
+        except ImportError as exc:
+            raise ImportError(
+                "vllm is required when using the vllm reference backend."
+            ) from exc
+
+        self.model_name = model_name
+        self.dtype = dtype
+        self.tensor_parallel_size = tensor_parallel_size
+        self.gpu_memory_utilization = gpu_memory_utilization
+        self.max_model_len = max_model_len
+        llm_kwargs = dict(
+            model=model_name,
+            dtype=_resolve_vllm_dtype(dtype),
+            tensor_parallel_size=tensor_parallel_size,
+            gpu_memory_utilization=gpu_memory_utilization,
+        )
+        if max_model_len is not None:
+            llm_kwargs["max_model_len"] = max_model_len
+        self.llm = LLM(**llm_kwargs)
+
+    @torch.no_grad()
+    def generate(
+        self,
+        full_prompts_list: List[str],
+        max_n_tokens,
+        temperature: float,
+        do_sample: bool = True,
+        top_p: float = 0.95,
+        top_k: int = 20,
+        num_return_sequences: int = 30,
+    ) -> List[str]:
+        from vllm import SamplingParams
+
+        sampling_params = SamplingParams(
+            max_tokens=max_n_tokens,
+            temperature=temperature if do_sample else 0.0,
+            top_p=top_p,
+            top_k=-1 if top_k is None or top_k <= 0 else top_k,
+            n=num_return_sequences,
+        )
+        outputs = self.llm.generate(full_prompts_list, sampling_params)
+        responses = []
+        for request_output in outputs:
+            for output in request_output.outputs:
+                responses.append(output.text)
+        return responses
     
     
     @torch.no_grad()
@@ -539,20 +609,61 @@ class ReferenceLLM:
         model_name_or_path: str,
         model_device: str = "cpu",
         dtype: torch.dtype = torch.float,
+        backend: Optional[str] = None,
+        tensor_parallel_size: int = 1,
+        gpu_memory_utilization: float = 0.9,
+        max_model_len: Optional[int] = None,
     ):
         self.client_name = client_name
         self.model_name_or_path = model_name_or_path
+        self.tensor_parallel_size = tensor_parallel_size
+        self.gpu_memory_utilization = gpu_memory_utilization
+        self.max_model_len = max_model_len
         print("Reference Client Name: ", client_name)
-        if "openai" in client_name or "anthropic" in client_name or "together" in client_name or "deepseek" in client_name or "dashscope" in client_name:
+
+        normalized_backend = backend.lower() if backend is not None else None
+        is_remote_client = (
+            "openai" in client_name
+            or "anthropic" in client_name
+            or "together" in client_name
+            or "deepseek" in client_name
+            or "dashscope" in client_name
+        )
+        if normalized_backend is None:
+            normalized_backend = "api" if is_remote_client else "hf"
+        if normalized_backend not in {"api", "hf", "vllm"}:
+            raise ValueError(
+                f"Unsupported reference backend: {normalized_backend}"
+            )
+
+        if normalized_backend == "api" and not is_remote_client:
+            raise ValueError(
+                "api backend requires a remote API client_name such as openai or together."
+            )
+        if normalized_backend in {"hf", "vllm"} and is_remote_client:
+            raise ValueError(
+                "vllm backend is only supported for local HuggingFace references."
+                if normalized_backend == "vllm"
+                else "hf backend is only supported for local HuggingFace references."
+            )
+
+        self.backend = normalized_backend
+
+        if normalized_backend == "api":
             lm = GPT(
                 client_name = client_name,
                 model_name = model_name_or_path
             )
             self.access_type = "remote"
-        # elif "together" in client_name:
-        #     lm = TogetherLLM(
-        #         model_name = model_name_or_path,
-        #     )
+        elif normalized_backend == "vllm":
+            lm = VLLMReference(
+                model_name=model_name_or_path,
+                dtype=dtype,
+                tensor_parallel_size=tensor_parallel_size,
+                gpu_memory_utilization=gpu_memory_utilization,
+                max_model_len=max_model_len,
+            )
+            self.access_type = "local"
         else:
             lm = HuggingFace(
                 model_name = model_name_or_path,

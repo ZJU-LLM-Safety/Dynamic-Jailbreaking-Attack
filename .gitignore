@@ -1,52 +1,107 @@
-
-.history/*
-
-data/
-scripts/
-.env
-src/.env
+# Python artifacts
 **/__pycache__/
 *.pyc
-llm-adaptive-attacks/
+*.pyo
 
-src/attacker_v2.py
+# Secrets / credentials
+.env
+**/.env
+.env.*
 
-src/attacker.py
+# Virtual environments
+.venv*/
+venv/
 
-src/attacker_structured_loss.py
+# Shell history
+.history/
 
-src/experiments_ablation.py
+# Local tool configs (not project config)
+.claude/
+.codex
+skills/
 
-tests/
+# Runtime logs
+logs/
+*.log
 
+# Server-specific run scripts (hardcoded device IDs / server paths)
+run_*.sh
+
+# Experiment output data (large, not for public repo)
+data/DTA_*/
+data/combined/
+data/results/
+data/eval/
+data/llama3_baseline_results/
+data/test_results/
+
+# Internal experiment notes
+ABLATION_EXPERIMENTS.md
+SCALABILITY_EXPERIMENTS.md
+
+# Internal planning documents
+docs/plans/
+
+# Personal / exploratory notebooks
+learn/
+eval/
 visual/
 
-.codex
+# Old and deprecated attacker versions
+src/attacker.py
+src/attacker_v2.py
+src/attacker_v3_gcg.py
+src/attacker_with_structured_loss.py
+src/combined_attacker.py
+src/experimental_local_multigpu_attacker.py
 
-ABLATION_EXPERIMENTS.md
+# Superseded entry points
+main.py
+src/main.py
 
-logs/
+# Internal experiment and analysis scripts
+src/experiments_ablation.py
+src/experiments_transfer.py
+src/random_search.py
+src/ablation_analysis/
+src/part1_noncombined_dta_gcg_runner.py
+src/suffix_optimization.py
 
+# Internal eval analysis scripts (keep src/eval/harmfulness/ and judge.py)
+src/eval/attack_baseline_with_eval.py
+src/eval/batch_eval_cold_attack.sh
+src/eval/batch_eval_gcg.sh
+src/eval/calculate_cold_attack_asr.py
+src/eval/calculate_gcg_asr.py
+src/eval/diff_only_DTA_success_samples.py
+src/eval/eval_analyze_DTA_combined_attacker_results.py
+src/eval/eval_analyze_DTA_experiment_J_results.py
+src/eval/eval_baselines_with_customed_dataset.py
+src/eval/eval_cold_attack_with_judges.py
+src/eval/eval_expA1_cross_main_results.py
+src/eval/eval_gcg_with_judges.py
+src/eval/eval_with_defense.py
+src/eval/note.md
+src/eval/run_harmfulness_eval.py
+
+# Old refactoring attempt
 refactored_project/
 
-.claude
+# Personal assets
+heatmap-last-year.png
 
-eval/
-
-learn/
-
-
-
-baselines/
-
-.env
-
-.python-version
-
-**/main.py
-
-main.py
-
+# Internal analysis outputs
+results/
+scripts/
+data/scalability_asr_table.md
 uv.lock
 
-results/
+# Server / model-specific test helpers (hardcoded server paths or GPU IDs)
+tests/test_run_*.py
+tests/test_experimental_*.py
+tests/test_experiments_ablation_structure.py
+tests/test_low_cpu_mem_model_loading.py
+tests/test_part1_noncombined_dta_gcg_isolation.py
+tests/test_suffix_optimization.py
+tests/test_attacker_output_hygiene.py
+tests/test_eval_analyze_dta_combined_attacker_results.py

@@ -15,7 +15,7 @@ dependencies = [
     "together>=2.5.0",
     "torch>=2.7.0",
     "tqdm>=4.67.3",
-    "transformers==4.43.1",
+    "transformers==4.49.0",
 ]
 
 [[tool.uv.index]]
