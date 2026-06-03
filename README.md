@@ -13,6 +13,8 @@ DJA appends a short adversarial suffix to a harmful prompt and iteratively refin
 
 This combination of *sampling-based exploration* and *gradient-based refinement* allows the attack to efficiently discover and reinforce harmful behaviors without requiring access to model weights beyond the target itself.
 
+![DJA Overview](docs/DJA_overview.png)
+
 ## Key Features
 
 - **Soft suffix logits.** The suffix is maintained as a continuous distribution over the vocabulary, enabling gradient updates in embedding space. Discrete tokens are materialized only for evaluation.
