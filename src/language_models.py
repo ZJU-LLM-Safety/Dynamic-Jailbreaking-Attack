@@ -166,7 +166,7 @@ class HuggingFace:
             top_k = top_k,
             num_return_sequences=num_return_sequences,
             eos_token_id=self.tokenizer.eos_token_id,
-            pad_token_id=self.tokenizer.eos_token_id,  # 有些模型需要显式设置
+            pad_token_id=self.tokenizer.eos_token_id,
         )
         input_len = inputs.input_ids.shape[1]
         with torch.inference_mode():

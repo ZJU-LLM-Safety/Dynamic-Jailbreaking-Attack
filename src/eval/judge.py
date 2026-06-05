@@ -138,10 +138,6 @@ def gpt35_judge(
     model_name = "gpt-3.5-turbo", 
     **kwargs,
 ):
-    # client = OpenAI(
-    #     api_key = os.getenv("OPENAI_API_KEY"),
-    #     base_url = os.getenv("OPENAI_API_BASE")
-    # )
     conv = get_conversation_template(model_name)
     conv.set_system_message(response_gpt35_system_prompt)
     user_prompt = response_gpt35_input_prompt.format(response=response)
@@ -251,7 +247,6 @@ def LlamaGuard3_judge(
         return_dict_in_generate = True, 
         pad_token_id = 0,
     )
-    # generated_tokens = output.sequences[:, prompt_len:]
     score_probs = torch.softmax(
         torch.cat(
             [
