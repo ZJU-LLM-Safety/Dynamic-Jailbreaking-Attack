@@ -2,16 +2,30 @@
 
 **Language / 语言:** [English](README.md) | [中文](README_zh.md)
 
-A gradient-guided adversarial suffix attack that combines high-temperature sampling with differentiable optimization to systematically elicit harmful outputs from aligned language models.
+## Abstract
+
+Existing gradient-based white-box jailbreak attacks typically follow a **static optimization paradigm**: a fixed target response is predetermined before the attack begins, and a fixed optimization strategy is used to search for adversarial suffixes that steer the model toward reproducing it. We argue this static paradigm limits attack capability in two key ways, and may underestimate the vulnerability of safety-aligned models under adaptive attacks.
+
+**First**, fixed target responses cause a *target–distribution mismatch*. The conditional output distribution of a safety-aligned model, given the current adversarial prompt, tends toward refusals and safe responses; pre-defined affirmative templates typically fall in the low-probability region of this distribution. The optimization therefore forces the model toward an externally imposed, unlikely target, leading to inefficient suffix search and reduced ability to elicit high-risk response patterns the model is itself capable of generating.
+
+**Second**, fixed optimization strategies ignore the *varying difficulty* across different harmful prompts. Different prompts may trigger refusal behaviors of different intensities and may require different suffix lengths, sampling intensities, and update schedules. A one-size-fits-all configuration provides insufficient search capacity for harder prompts: attacks that could succeed with greater suffix capacity, more thorough sampling, or adjusted optimization may fail under an inflexible static strategy.
+
+To address these limitations, we propose **Dynamic Jailbreaking Attack (DJA)**, a dynamic white-box jailbreaking framework. Rather than treating jailbreaking as static suffix optimization toward a fixed target, DJA models it as a **dynamic closed-loop search**: the attack adaptively determines *which* target response to optimize toward and *how* to search for the adversarial suffix at each step.
+
+Concretely, at each outer iteration, DJA samples candidate responses from the target model's conditional output distribution under the current adversarial prompt, then selects the most effective target via a **multi-objective selector** that jointly considers harmfulness, semantic relevance, utility, refusal evasion, and generation feasibility. This ensures the optimization target is not an external template but a feasible high-risk response pattern already exposed by the model. After several inner gradient steps, DJA resamples and selects a new target based on the updated adversarial prompt, so the attack objective continuously adapts to the model's evolving output distribution.
+
+DJA further employs a **dynamic optimization strategy**, adjusting suffix capacity, sampling intensity, and update schedule based on current attack progress. For harder prompts or stalled optimization, it can expand the suffix length, increase candidate exploration, or adjust the optimization procedure to improve success rates and efficiency.
+
+Experiments on multiple state-of-the-art safety-aligned LLMs and jailbreak benchmarks show that DJA achieves **100% attack success rate** on all evaluated white-box models and consistently outperforms existing gradient-based jailbreak methods. These results suggest that static jailbreak paradigms may significantly underestimate the vulnerability of safety-aligned models under adaptive attacks.
 
 ## Overview
 
 DJA appends a short adversarial suffix to a harmful prompt and iteratively refines it through a **double-loop** structure:
 
-- **Outer loop** — samples multiple candidate responses from the target model at high temperature, then selects the best one via a composite harmfulness-plus-quality judge.
-- **Inner loop** — optimizes the suffix using gradients from a local differentiable forward pass, pushing the model toward reproducing the selected high-scoring response.
+- **Outer loop** — samples candidate responses from the target model's conditional distribution under the current adversarial prompt, then selects the most effective target via a multi-objective composite judge (harmfulness, relevance, specificity, coherence, non-refusal). The selected response is a high-risk pattern the model is already capable of generating — not an external template.
+- **Inner loop** — optimizes the suffix using gradients from a differentiable forward pass on the target model, pushing it to reliably reproduce the selected response.
 
-This combination of *sampling-based exploration* and *gradient-based refinement* allows the attack to efficiently discover and reinforce harmful behaviors without requiring access to model weights beyond the target itself.
+After each inner phase, DJA resamples fresh candidates from the *updated* adversarial prompt and picks a new target, so the optimization objective continuously tracks the model's evolving output distribution. This *sampling-based exploration* + *gradient-based refinement* cycle, combined with a dynamic optimization strategy that adjusts suffix length and sampling budget per-prompt, allows the attack to efficiently discover and reinforce harmful behaviors even in the hardest cases.
 
 ![DJA Overview](docs/DJA_overview.png)
 
