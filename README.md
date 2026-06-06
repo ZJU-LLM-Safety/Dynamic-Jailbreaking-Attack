@@ -31,11 +31,11 @@ After each inner phase, DJA resamples fresh candidates from the *updated* advers
 
 ## Key Features
 
-- **Soft suffix logits.** The suffix is maintained as a continuous distribution over the vocabulary, enabling gradient updates in embedding space. Discrete tokens are materialized only for evaluation.
-- **Composite scoring.** Responses are ranked by a weighted judge that covers harmfulness (weight 0.70) and four quality dimensions — specificity, relevance, coherence, non-refusal (total weight 0.30). This prevents the attack from optimizing toward incoherent or trivially harmful outputs.
-- **Degeneracy hard gate.** Degenerate responses (repetitive token loops, empty outputs, all-punctuation) are automatically detected and zeroed out before scoring, eliminating a common reward-hacking failure mode.
-- **Adaptive sampling.** The per-prompt sampling budget starts small and expands only when no sufficiently unsafe response is found, saving cost on easy prompts while allocating more exploration to hard ones.
-- **Dynamic suffix length** (optional). The suffix starts at a shorter initial length and expands automatically when optimization plateaus, trading compute for attack capacity on difficult targets.
+- **Dynamic target tracking.** Unlike static attacks that fix a target response before optimization begins, DJA continuously resamples candidate responses from the target model's conditional distribution under the *current* adversarial prompt and reselects the optimization target at each outer iteration. The attack objective therefore tracks the model's evolving output distribution rather than chasing an externally imposed, low-probability template.
+- **Dynamic sampling budget.** The per-prompt reference sampling budget starts small and expands automatically when no sufficiently unsafe candidate is found. Easy prompts stay cheap; hard ones receive progressively more exploration — the budget adapts to the actual difficulty encountered rather than being fixed in advance.
+- **Dynamic suffix capacity.** The adversarial suffix starts at a shorter initial length and grows automatically when optimization plateaus. Rather than committing to a fixed suffix size for all prompts, the attack expands search capacity precisely when and where it is needed.
+- **Multi-objective candidate selection.** Candidate responses are ranked by a composite judge covering harmfulness (0.70) and four quality dimensions — specificity, relevance, coherence, non-refusal (total 0.30). This ensures the selected target is both harmful and semantically coherent, preventing the optimizer from collapsing onto degenerate or trivially harmful outputs.
+- **Degeneracy hard gate.** Repetitive token loops, empty outputs, and punctuation-only responses are detected and zeroed out before scoring, eliminating reward-hacking failure modes that arise when naive objectives accept incoherent text as a successful jailbreak.
 
 ## Main Results
 
