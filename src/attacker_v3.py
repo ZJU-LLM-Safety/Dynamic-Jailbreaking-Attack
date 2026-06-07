@@ -1775,7 +1775,8 @@ class DynamicTemperatureAttacker:
         adaptive_sample: bool = False,
         adaptive_sample_max: int = 100,
         adaptive_sample_threshold: float = 0.5,
-        use_quality_scoring: bool = False,
+        use_quality_scoring: bool = True,
+        early_stop_threshold: float = 0.6,
     ):
         prompt_ids = self.local_llm_tokenizer(prompt, return_tensors="pt").input_ids.to(
             self.local_llm_device
@@ -2258,7 +2259,7 @@ class DynamicTemperatureAttacker:
                         f"current suffix length={current_suffix_length}"
                     )
 
-            if best_final_score >= 0.6:
+            if best_final_score >= early_stop_threshold:
                 break
 
         return (
@@ -2405,7 +2406,8 @@ class DynamicTemperatureAttacker:
         adaptive_sample: bool = False,
         adaptive_sample_max: int = 100,
         adaptive_sample_threshold: float = 0.5,
-        use_quality_scoring: bool = False,
+        use_quality_scoring: bool = True,
+        early_stop_threshold: float = 0.6,
     ) -> List[str]:
         assert target_set is not None or target_fn is not None, "Either target_set or target_fn must be provided."
         if target_set is None and target_fn is not None:
@@ -2447,6 +2449,7 @@ class DynamicTemperatureAttacker:
                     adaptive_sample_max=adaptive_sample_max,
                     adaptive_sample_threshold=adaptive_sample_threshold,
                     use_quality_scoring=use_quality_scoring,
+                    early_stop_threshold=early_stop_threshold,
                 )
                 results.append(
                     {
