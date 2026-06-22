@@ -24,6 +24,8 @@ Across recent safety-aligned LLMs and jailbreak benchmarks, DJA reaches \textbf{
 - **Multi-objective candidate selection.** Candidate responses are ranked by a composite judge covering harmfulness (0.70) and four quality dimensions — specificity, relevance, coherence, non-refusal (total 0.30). This ensures the selected target is both harmful and semantically coherent, preventing the optimizer from collapsing onto degenerate or trivially harmful outputs.
 - **Degeneracy hard gate.** Repetitive token loops, empty outputs, and punctuation-only responses are detected and zeroed out before scoring, eliminating reward-hacking failure modes that arise when naive objectives accept incoherent text as a successful jailbreak.
 
+![DJA Overview](docs/DJA_overview_02.png)
+
 ## Main Results
 
 DJA achieves **100% ASR** across 25 open-weight models (0.5B–32B) spanning 7 model families.
