@@ -16,17 +16,6 @@ When the multi-objective scorer finds no satisfactory target, DJA gradually incr
 When these selected high-risk targets repeatedly resists the current fixed-length suffix, DJA extends the suffix to provide higher adversarial capacity.
 Across recent safety-aligned LLMs and jailbreak benchmarks, DJA reaches \textbf{100\%} ASR on all evaluated white-box models and consistently outperforms gradient-based baselines, indicating  that static formulations substantially underestimate vulnerability to adaptive attacks.
 
-## Overview
-
-DJA appends a short adversarial suffix to a harmful prompt and iteratively refines it through a **double-loop** structure:
-
-- **Outer loop** — samples candidate responses from the target model's conditional distribution under the current adversarial prompt, then selects the most effective target via a multi-objective composite judge (harmfulness, relevance, specificity, coherence, non-refusal). The selected response is a high-risk pattern the model is already capable of generating — not an external template.
-- **Inner loop** — optimizes the suffix using gradients from a differentiable forward pass on the target model, pushing it to reliably reproduce the selected response.
-
-After each inner phase, DJA resamples fresh candidates from the *updated* adversarial prompt and picks a new target, so the optimization objective continuously tracks the model's evolving output distribution. This *sampling-based exploration* + *gradient-based refinement* cycle, combined with a dynamic optimization strategy that adjusts suffix length and sampling budget per-prompt, allows the attack to efficiently discover and reinforce harmful behaviors even in the hardest cases.
-
-![DJA Overview](docs/DJA_overview.png)
-
 ## Key Features
 
 - **Dynamic target tracking.** Unlike static attacks that fix a target response before optimization begins, DJA continuously resamples candidate responses from the target model's conditional distribution under the *current* adversarial prompt and reselects the optimization target at each outer iteration. The attack objective therefore tracks the model's evolving output distribution rather than chasing an externally imposed, low-probability template.
