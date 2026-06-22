@@ -4,19 +4,17 @@
 
 ## Abstract
 
-Existing gradient-based white-box jailbreak attacks typically follow a **static optimization paradigm**: a fixed target response is predetermined before the attack begins, and a fixed optimization strategy is used to search for adversarial suffixes that steer the model toward reproducing it. We argue this static paradigm limits attack capability in two key ways, and may underestimate the vulnerability of safety-aligned models under adaptive attacks.
-
-**First**, fixed target responses cause a *target–distribution mismatch*. The conditional output distribution of a safety-aligned model, given the current adversarial prompt, tends toward refusals and safe responses; pre-defined affirmative templates typically fall in the low-probability region of this distribution. The optimization therefore forces the model toward an externally imposed, unlikely target, leading to inefficient suffix search and reduced ability to elicit high-risk response patterns the model is itself capable of generating.
-
-**Second**, fixed optimization strategies ignore the *varying difficulty* across different harmful prompts. Different prompts may trigger refusal behaviors of different intensities and may require different suffix lengths, sampling intensities, and update schedules. A one-size-fits-all configuration provides insufficient search capacity for harder prompts: attacks that could succeed with greater suffix capacity, more thorough sampling, or adjusted optimization may fail under an inflexible static strategy.
-
-To address these limitations, we propose **Dynamic Jailbreaking Attack (DJA)**, a dynamic white-box jailbreaking framework. Rather than treating jailbreaking as static suffix optimization toward a fixed target, DJA models it as a **dynamic closed-loop search**: the attack adaptively determines *which* target response to optimize toward and *how* to search for the adversarial suffix at each step.
-
-Concretely, at each outer iteration, DJA samples candidate responses from the target model's conditional output distribution under the current adversarial prompt, then selects the most effective target via a **multi-objective selector** that jointly considers harmfulness, semantic relevance, utility, refusal evasion, and generation feasibility. This ensures the optimization target is not an external template but a feasible high-risk response pattern already exposed by the model. After several inner gradient steps, DJA resamples and selects a new target based on the updated adversarial prompt, so the attack objective continuously adapts to the model's evolving output distribution.
-
-DJA further employs a **dynamic optimization strategy**, adjusting suffix capacity, sampling intensity, and update schedule based on current attack progress. For harder prompts or stalled optimization, it can expand the suffix length, increase candidate exploration, or adjust the optimization procedure to improve success rates and efficiency.
-
-Experiments on multiple state-of-the-art safety-aligned LLMs and jailbreak benchmarks show that DJA achieves **100% attack success rate** on all evaluated white-box models and consistently outperforms existing gradient-based jailbreak methods. These results suggest that static jailbreak paradigms may significantly underestimate the vulnerability of safety-aligned models under adaptive attacks.
+Existing gradient-based jailbreak attacks typically optimize a fixed-length adversarial suffix toward a predefined target response with a static optimization strategy.
+We argue that this fully static formulation undermines the effectiveness, efficiency and flexibility of gradient-based jailbreaking because
+(i) A predefined target usually lies in the low-probability region of a safety-aligned LLM's conditional output distribution, forcing the optimization to pursue an unlikely response pattern; 
+(ii) Simple affirmative targets may even mislead LLMs to generate affirmative responses that are not highly relevant to the prompts;
+(iii) Fixed optimization strategy and suffix length treat all prompts equally, leading to limited attack capability for hard prompts and redundant capacity for easy ones. 
+To address these limitations, we propose \underline{D}ynamic \underline{J}ailbreaking \underline{A}ttack (\textbf{DJA}), a gradient-based jailbreak framework using dynamic relevant targets, suffix length, and optimization strategy to craft the adversarial prompts.
+In each attack round, DJA samples candidate responses from the LLM's current conditional distribution and uses a multi-objective scorer to select a high-risk and prompt-relevant target for per-round optimization.
+In the optimization process, DJA adapts its optimization strategy per prompt. 
+When the multi-objective scorer finds no satisfactory target, DJA gradually increases the number of sampled candidates; 
+When these selected high-risk targets repeatedly resists the current fixed-length suffix, DJA extends the suffix to provide higher adversarial capacity.
+Across recent safety-aligned LLMs and jailbreak benchmarks, DJA reaches \textbf{100\%} ASR on all evaluated white-box models and consistently outperforms gradient-based baselines, indicating  that static formulations substantially underestimate vulnerability to adaptive attacks.
 
 ## Overview
 
@@ -39,29 +37,73 @@ After each inner phase, DJA resamples fresh candidates from the *updated* advers
 
 ## Main Results
 
-DJA achieves **100% ASR** across 17 open-weight models ranging from 0.5B to 24B parameters.
+DJA achieves **100% ASR** across 17 open-weight models (0.5B–24B) spanning 5 model families.
+All results are measured on AdvBench-100 with a GPT-4o-mini harmfulness judge (threshold ≥ 0.5).
+
+<details open>
+<summary><b>Gemma (Google) — 2 models</b></summary>
 
 | Model | Size | ASR |
 |---|---|---|
-| GPT-OSS | 20B | 100% |
-| Gemma2 | 2B | 100% |
 | Gemma | 7B | 100% |
-| Llama 3.2 | 3B | 100% |
+| Gemma2 | 2B | 100% |
+
+</details>
+
+<details open>
+<summary><b>Llama (Meta) — 2 models</b></summary>
+
+| Model | Size | ASR |
+|---|---|---|
 | Llama 3 | 8B | 100% |
+| Llama 3.2 | 3B | 100% |
+
+</details>
+
+<details open>
+<summary><b>Mistral — 3 models</b></summary>
+
+| Model | Size | ASR |
+|---|---|---|
 | Mistral v0.3 | 7B | 100% |
 | Mistral-Nemo | 12B | 100% |
 | Mistral-Small | 24B | 100% |
+
+</details>
+
+<details open>
+<summary><b>Qwen2.5 (Alibaba) — 5 models</b></summary>
+
+| Model | Size | ASR |
+|---|---|---|
 | Qwen2.5 | 0.5B | 100% |
 | Qwen2.5 | 1.5B | 100% |
 | Qwen2.5 | 3B | 100% |
 | Qwen2.5 | 7B | 100% |
 | Qwen2.5 | 14B | 100% |
+
+</details>
+
+<details open>
+<summary><b>Qwen3.5 (Alibaba) — 4 models</b></summary>
+
+| Model | Size | ASR |
+|---|---|---|
 | Qwen3.5 | 0.8B | 100% |
 | Qwen3.5 | 2B | 100% |
 | Qwen3.5 | 4B | 100% |
 | Qwen3.5 | 9B | 100% |
 
-ASR is measured on AdvBench-100 with a GPT-4o-mini harmfulness judge (threshold ≥ 0.5).
+</details>
+
+<details open>
+<summary><b>Other — 1 model</b></summary>
+
+| Model | Size | ASR |
+|---|---|---|
+| GPT-OSS | 20B | 100% |
+
+</details>
 
 ## Installation
 
