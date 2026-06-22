@@ -153,21 +153,22 @@ python src/part1_noncombined_dta_runner.py \
   --save-dir data/output
 ```
 
-主要参数说明：
+<details>
+<summary><b>主要参数说明</b></summary>
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
 | `--target-llm` | 必填 | 目标模型名称（参见 `attacker_v3.py` 中的 `MODEL_NAME_TO_PATH`） |
-| `--num-iters` | 20 | 外循环优化总轮数 |
-| `--num-inner-iters` | 10 | 每轮外循环的内循环梯度步数 |
+| `--num-iters` | inf | 攻击轮数（attack rounds） |
+| `--num-inner-iters` | 10 | 每轮的优化更新步数（optimization update steps） |
 | `--sample-count` | 30 | 每轮外循环的初始参考采样数量 |
 | `--adaptive-sample` | 开启 | 攻击遇阻时自动扩展采样预算 |
 | `--suffix-max-length` | 20 | 对抗后缀最大长度（token 数） |
 | `--suffix-init-length` | None | 动态扩展的初始后缀长度（None 表示固定长度） |
 | `--suffix-expand-patience` | 0 | 无改善多少轮后扩展后缀（0 表示禁用） |
 | `--use-quality-scoring` | 开启 | 启用综合有害性 + 质量评分 |
-| `--start-index` | 0 | 数据集起始索引 |
-| `--end-index` | 100 | 数据集结束索引 |
+
+</details>
 
 ## 后处理重评分
 

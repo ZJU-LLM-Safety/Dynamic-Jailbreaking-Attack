@@ -154,21 +154,22 @@ python src/part1_noncombined_dta_runner.py \
   --save-dir data/output
 ```
 
-Key arguments:
+<details>
+<summary><b>Key arguments</b></summary>
 
 | Argument | Default | Description |
 |---|---|---|
 | `--target-llm` | required | Model name (see `MODEL_NAME_TO_PATH` in `attacker_v3.py`) |
-| `--num-iters` | 20 | Number of outer optimization iterations |
-| `--num-inner-iters` | 10 | Number of inner gradient steps per outer iteration |
+| `--num-iters` | inf | Number of attack rounds |
+| `--num-inner-iters` | 10 | Optimization update steps per attack round |
 | `--sample-count` | 30 | Initial reference sampling count per outer iteration |
 | `--adaptive-sample` | on | Expand sampling budget when attack is struggling |
 | `--suffix-max-length` | 20 | Maximum adversarial suffix length (in tokens) |
 | `--suffix-init-length` | None | Starting suffix length for dynamic expansion (None = fixed) |
 | `--suffix-expand-patience` | 0 | Outer iters without improvement before expanding suffix (0 = disabled) |
 | `--use-quality-scoring` | on | Enable composite harmfulness + quality judge |
-| `--start-index` | 0 | Start index in the dataset |
-| `--end-index` | 100 | End index in the dataset |
+
+</details>
 
 ## Post-hoc Rescoring
 
