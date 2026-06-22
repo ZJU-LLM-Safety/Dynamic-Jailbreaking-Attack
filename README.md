@@ -40,7 +40,7 @@ After each inner phase, DJA resamples fresh candidates from the *updated* advers
 DJA achieves **100% ASR** across 17 open-weight models (0.5B–24B) spanning 5 model families.
 All results are measured on AdvBench-100 with a GPT-4o-mini harmfulness judge (threshold ≥ 0.5).
 
-<details open>
+<details>
 <summary><b>Gemma (Google) — 2 models</b></summary>
 
 | Model | Size | ASR |
@@ -50,7 +50,7 @@ All results are measured on AdvBench-100 with a GPT-4o-mini harmfulness judge (t
 
 </details>
 
-<details open>
+<details>
 <summary><b>Llama (Meta) — 2 models</b></summary>
 
 | Model | Size | ASR |
@@ -60,7 +60,7 @@ All results are measured on AdvBench-100 with a GPT-4o-mini harmfulness judge (t
 
 </details>
 
-<details open>
+<details>
 <summary><b>Mistral — 3 models</b></summary>
 
 | Model | Size | ASR |
@@ -71,7 +71,7 @@ All results are measured on AdvBench-100 with a GPT-4o-mini harmfulness judge (t
 
 </details>
 
-<details open>
+<details>
 <summary><b>Qwen2.5 (Alibaba) — 5 models</b></summary>
 
 | Model | Size | ASR |
@@ -84,7 +84,7 @@ All results are measured on AdvBench-100 with a GPT-4o-mini harmfulness judge (t
 
 </details>
 
-<details open>
+<details>
 <summary><b>Qwen3.5 (Alibaba) — 4 models</b></summary>
 
 | Model | Size | ASR |
@@ -96,8 +96,8 @@ All results are measured on AdvBench-100 with a GPT-4o-mini harmfulness judge (t
 
 </details>
 
-<details open>
-<summary><b>Other — 1 model</b></summary>
+<details>
+<summary><b>GPT-OSS — 1 model</b></summary>
 
 | Model | Size | ASR |
 |---|---|---|

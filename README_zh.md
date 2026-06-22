@@ -39,7 +39,7 @@ DJA 的三个动态机制是同一"动态"哲学的三种表达——攻击在�
 DJA 在 17 个开源模型（参数量 0.5B 至 24B）上均实现了 **100% ASR**，覆盖 5 个模型家族。
 所有结果均基于 AdvBench-100 测试集，采用 GPT-4o-mini 有害性评分，判定阈值 ≥ 0.5。
 
-<details open>
+<details>
 <summary><b>Gemma（Google）— 2 个模型</b></summary>
 
 | 模型 | 参数规模 | ASR |
@@ -49,7 +49,7 @@ DJA 在 17 个开源模型（参数量 0.5B 至 24B）上均实现了 **100% ASR
 
 </details>
 
-<details open>
+<details>
 <summary><b>Llama（Meta）— 2 个模型</b></summary>
 
 | 模型 | 参数规模 | ASR |
@@ -59,7 +59,7 @@ DJA 在 17 个开源模型（参数量 0.5B 至 24B）上均实现了 **100% ASR
 
 </details>
 
-<details open>
+<details>
 <summary><b>Mistral — 3 个模型</b></summary>
 
 | 模型 | 参数规模 | ASR |
@@ -70,7 +70,7 @@ DJA 在 17 个开源模型（参数量 0.5B 至 24B）上均实现了 **100% ASR
 
 </details>
 
-<details open>
+<details>
 <summary><b>Qwen2.5（阿里巴巴）— 5 个模型</b></summary>
 
 | 模型 | 参数规模 | ASR |
@@ -83,7 +83,7 @@ DJA 在 17 个开源模型（参数量 0.5B 至 24B）上均实现了 **100% ASR
 
 </details>
 
-<details open>
+<details>
 <summary><b>Qwen3.5（阿里巴巴）— 4 个模型</b></summary>
 
 | 模型 | 参数规模 | ASR |
@@ -95,8 +95,8 @@ DJA 在 17 个开源模型（参数量 0.5B 至 24B）上均实现了 **100% ASR
 
 </details>
 
-<details open>
-<summary><b>其他 — 1 个模型</b></summary>
+<details>
+<summary><b>GPT-OSS — 1 个模型</b></summary>
 
 | 模型 | 参数规模 | ASR |
 |---|---|---|
