@@ -37,7 +37,7 @@ After each inner phase, DJA resamples fresh candidates from the *updated* advers
 
 ## Main Results
 
-DJA achieves **100% ASR** across 17 open-weight models (0.5B–24B) spanning 5 model families.
+DJA achieves **100% ASR** across 25 open-weight models (0.5B–32B) spanning 7 model families.
 All results are measured on AdvBench-100 with a GPT-4o-mini harmfulness judge (threshold ≥ 0.5).
 
 <details>
@@ -72,7 +72,7 @@ All results are measured on AdvBench-100 with a GPT-4o-mini harmfulness judge (t
 </details>
 
 <details>
-<summary><b>Qwen2.5 (Alibaba) — 5 models</b></summary>
+<summary><b>Qwen2.5 (Alibaba) — 6 models</b></summary>
 
 | Model | Size | ASR |
 |---|---|---|
@@ -81,6 +81,22 @@ All results are measured on AdvBench-100 with a GPT-4o-mini harmfulness judge (t
 | Qwen2.5 | 3B | 100% |
 | Qwen2.5 | 7B | 100% |
 | Qwen2.5 | 14B | 100% |
+| Qwen2.5 | 32B | 100% |
+
+</details>
+
+<details>
+<summary><b>Qwen3 (Alibaba) — 7 models</b></summary>
+
+| Model | Size | ASR |
+|---|---|---|
+| Qwen3 | 0.6B | 100% |
+| Qwen3 | 1.7B | 100% |
+| Qwen3 | 4B | 100% |
+| Qwen3 | 8B | 100% |
+| Qwen3 | 14B | 100% |
+| Qwen3 | 30B | 100% |
+| Qwen3 | 32B | 100% |
 
 </details>
 

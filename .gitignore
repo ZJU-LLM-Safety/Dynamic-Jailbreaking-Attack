@@ -109,3 +109,8 @@ tests/test_part1_noncombined_dta_gcg_isolation.py
 tests/test_suffix_optimization.py
 tests/test_attacker_output_hygiene.py
 tests/test_eval_analyze_dta_combined_attacker_results.py
+
+.python-version
+
+docs/DJA_figure_prompt.md
+docs/DTA_algorithm*
