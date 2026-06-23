@@ -21,6 +21,7 @@ Across recent safety-aligned LLMs and jailbreak benchmarks, DJA reaches \textbf{
 - **Dynamic target tracking.** Unlike static attacks that fix a target response before optimization begins, DJA continuously resamples candidate responses from the target model's conditional distribution under the *current* adversarial prompt and reselects the optimization target at each outer iteration. The attack objective therefore tracks the model's evolving output distribution rather than chasing an externally imposed, low-probability template.
 - **Dynamic sampling budget.** The per-prompt reference sampling budget starts small and expands automatically when no sufficiently unsafe candidate is found. Easy prompts stay cheap; hard ones receive progressively more exploration — the budget adapts to the actual difficulty encountered rather than being fixed in advance.
 - **Dynamic suffix capacity.** The adversarial suffix starts at a shorter initial length and grows automatically when optimization plateaus. Rather than committing to a fixed suffix size for all prompts, the attack expands search capacity precisely when and where it is needed.
+- **Dynamic inner iterations.** Rather than running a fixed number of gradient steps per attack round, the inner loop monitors the relative loss improvement over a sliding window and exits early once optimization has converged (`|ΔL|/|L| < ε`). A configurable minimum step count guarantees sufficient exploration before any early exit is allowed.
 - **Multi-objective candidate selection.** Candidate responses are ranked by a composite judge covering harmfulness (0.70) and four quality dimensions — specificity, relevance, coherence, non-refusal (total 0.30). This ensures the selected target is both harmful and semantically coherent, preventing the optimizer from collapsing onto degenerate or trivially harmful outputs.
 - **Degeneracy hard gate.** Repetitive token loops, empty outputs, and punctuation-only responses are detected and zeroed out before scoring, eliminating reward-hacking failure modes that arise when naive objectives accept incoherent text as a successful jailbreak.
 
@@ -170,6 +171,7 @@ python src/part1_noncombined_dta_runner.py \
 | `--suffix-init-length` | None | Starting suffix length for dynamic expansion (None = fixed) |
 | `--suffix-expand-patience` | 0 | Outer iters without improvement before expanding suffix (0 = disabled) |
 | `--use-quality-scoring` | on | Enable composite harmfulness + quality judge |
+| `--min-inner-iters` | 10 | Minimum gradient steps before inner-loop plateau exit is allowed |
 
 </details>
 
