@@ -6,6 +6,7 @@ works without a GPU environment.  Model weights are only loaded when
 evaluate() / attack_single() / score() is first called.
 """
 
+import time as _time
 from pathlib import Path
 from typing import Any, List, Optional, Union
 
@@ -135,6 +136,7 @@ class DJAEvaluator:
         end_index: Optional[int] = None,
         save_path: Optional[str] = None,
         verbose: bool = False,
+        show_progress: bool = True,
     ) -> RedTeamReport:
         """Run the full attack pipeline on a prompt set and return a report.
 
@@ -148,17 +150,45 @@ class DJAEvaluator:
             If given, intermediate results are written as JSONL after each
             prompt so progress survives crashes.
         verbose:
-            Print per-iteration loss details.
+            Print per-iteration loss/score details from the inner attack loop.
+        show_progress:
+            Print the DJA banner, config table, per-prompt results, and final
+            report.  Set to False when using as a silent library call.
         """
-        self._ensure_loaded()
+        from . import cli as _cli
 
+        # ── Banner + config ──────────────────────────────────────────────────
+        if show_progress:
+            try:
+                from importlib.metadata import version as _pkgver
+                _ver = _pkgver("dja-redteam")
+            except Exception:
+                _ver = "0.1.0"
+            _cli.print_banner(_ver)
+            _cli.print_config(self.config)
+
+        # ── Model loading (lazy) ─────────────────────────────────────────────
+        _first_load = self._attacker is None
+        if show_progress and _first_load:
+            print(f"  {_cli.dim('▷')} Loading model weights …  ", end="", flush=True)
+        self._ensure_loaded()
+        if show_progress and _first_load:
+            print(_cli.green("done"))
+            print()
+
+        # ── Resolve prompts ──────────────────────────────────────────────────
         if isinstance(prompts, str):
             from ._core.utils import load_target_set
             prompts = load_target_set(prompts)
-
         if end_index is None:
             end_index = len(prompts)
 
+        n = end_index - start_index
+        if show_progress:
+            _cli.print_attack_start(n)
+
+        # ── Run attack ───────────────────────────────────────────────────────
+        t_attack = _time.time()
         raw_results = self._attacker.attack(
             target_set=prompts,
             start_index=start_index,
@@ -167,9 +197,17 @@ class DJAEvaluator:
             verbose=verbose,
             **self._build_attack_kwargs(),
         )
+        t_done = _time.time()
 
         results = [self._to_attack_result(r) for r in raw_results]
-        return self._build_report(results)
+        report = self._build_report(results)
+
+        # ── Visual output ────────────────────────────────────────────────────
+        if show_progress:
+            _cli.print_results(results, t_attack, t_done)
+            _cli.print_report(report, t_attack, t_done)
+
+        return report
 
     def attack_single(self, prompt: str, verbose: bool = False) -> AttackResult:
         """Attack a single prompt and return a structured result."""
