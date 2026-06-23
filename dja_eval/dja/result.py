@@ -59,6 +59,25 @@ class AttackResult:
     # attacker exposes the raw token list in a future release.
     suffix_length: int = 0
 
+    @classmethod
+    def from_dict(cls, d: dict) -> "AttackResult":
+        return cls(
+            prompt=d["prompt"],
+            adversarial_suffix=d.get("adversarial_suffix", ""),
+            adversarial_prompt=d.get("adversarial_prompt", d["prompt"]),
+            response=d.get("response", ""),
+            harm_score=float(d.get("harm_score", 0.0)),
+            quality_scores=d.get("quality_scores"),
+            composite_score=float(d.get("composite_score", 0.0)),
+            is_jailbreak=bool(d.get("is_jailbreak", False)),
+            iterations_used=int(d.get("iterations_used", -1)),
+            reference_response=d.get("reference_response", ""),
+            reference_harm_score=float(d.get("reference_harm_score", 0.0)),
+            reference_composite_score=float(d.get("reference_composite_score", 0.0)),
+            response_is_degenerate=bool(d.get("response_is_degenerate", False)),
+            suffix_length=int(d.get("suffix_length", 0)),
+        )
+
     def to_dict(self) -> dict:
         return {
             "prompt": self.prompt,
