@@ -29,6 +29,9 @@ all = ["dja-redteam[openai,anthropic,together]"]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[project.scripts]
+dja = "dja._main:main"
+
 [tool.hatch.build.targets.wheel]
 # Only ship the dja/ package, not examples/
 packages = ["dja"]
