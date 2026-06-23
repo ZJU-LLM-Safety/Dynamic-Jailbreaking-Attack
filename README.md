@@ -167,8 +167,8 @@ python src/part1_noncombined_dta_runner.py \
 | `--num-inner-iters` | 10 | Optimization update steps per attack round |
 | `--sample-count` | 30 | Initial reference sampling count per outer iteration |
 | `--adaptive-sample` | on | Expand sampling budget when attack is struggling |
-| `--suffix-max-length` | 20 | Maximum adversarial suffix length (in tokens) |
-| `--suffix-init-length` | None | Starting suffix length for dynamic expansion (None = fixed) |
+| `--suffix-max-length` | 30 | Maximum adversarial suffix length (in tokens) |
+| `--suffix-init-length` | 5 | Starting suffix length for dynamic expansion |
 | `--suffix-expand-patience` | 0 | Outer iters without improvement before expanding suffix (0 = disabled) |
 | `--use-quality-scoring` | on | Enable composite harmfulness + quality judge |
 | `--min-inner-iters` | 10 | Minimum gradient steps before inner-loop plateau exit is allowed |
