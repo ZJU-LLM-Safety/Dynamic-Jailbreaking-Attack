@@ -1,35 +1,34 @@
-"""DJAEvaluator — main entry point for white-box red-team evaluation."""
+"""DJAEvaluator — main entry point for white-box red-team evaluation.
 
-import sys
+Heavy dependencies (torch, attacker_v3) are imported lazily inside
+_ensure_loaded() so that ``from dja import DJAEvaluator, DJAConfig``
+works without a GPU environment.  Model weights are only loaded when
+evaluate() / attack_single() / score() is first called.
+"""
+
 from pathlib import Path
-from typing import List, Optional, Union
-
-import torch
+from typing import Any, List, Optional, Union
 
 from .config import DJAConfig, ModelConfig
 from .judge import BaseJudge
 from .result import AttackResult, RedTeamReport, ResponseScore
 
-# ── Resolve the sibling src/ directory so core modules are importable ───────
-_SRC_DIR = Path(__file__).resolve().parents[2] / "src"
-if str(_SRC_DIR) not in sys.path:
-    sys.path.insert(0, str(_SRC_DIR))
 
-from attacker_v3 import (  # noqa: E402
-    DEFAULT_COMPOSITE_SCORE_WEIGHTS,
-    MODEL_NAME_TO_PATH,
-    DynamicTemperatureAttacker,
-    compute_composite_score_from_components,
-    detect_response_degeneracy,
-    get_model_path,
-)
+def _resolve_model_path(model: str, root_dir: Optional[str] = None) -> str:
+    """Resolve a model identifier to a local path or HuggingFace model ID.
 
-_DTYPE_MAP = {
-    "float16": torch.float16,
-    "float32": torch.float32,
-    "float": torch.float32,
-    "bfloat16": torch.bfloat16,
-}
+    Resolution order
+    ----------------
+    1. ``root_dir`` set → ``root_dir / model``  (local directory)
+    2. ``model`` is an absolute path → use as-is
+    3. Otherwise → pass through; HuggingFace ``from_pretrained`` resolves it
+       (hub download, cache hit, or relative local path).
+    """
+    if root_dir is not None:
+        return str(Path(root_dir) / model)
+    if Path(model).is_absolute():
+        return model
+    return model
 
 
 class DJAEvaluator:
@@ -39,7 +38,21 @@ class DJAEvaluator:
 
         from dja import DJAEvaluator, DJAConfig, ModelConfig
 
-        evaluator = DJAEvaluator(DJAConfig(model=ModelConfig(target_model="Qwen2.5-7B")))
+        # HuggingFace download
+        cfg = DJAConfig(model=ModelConfig(target_model="Qwen/Qwen2.5-7B-Instruct"))
+
+        # Local weights under a shared root
+        cfg = DJAConfig(model=ModelConfig(
+            target_model="Qwen2.5-7B-Instruct",
+            root_dir="/data/models",
+        ))
+
+        # Absolute local path
+        cfg = DJAConfig(model=ModelConfig(
+            target_model="/data/models/Qwen2.5-7B-Instruct",
+        ))
+
+        evaluator = DJAEvaluator(cfg)
         report = evaluator.evaluate("data/raw/advbench_100.csv")
         print(report.summary())
 
@@ -48,40 +61,55 @@ class DJAEvaluator:
     config:
         Full DJA configuration (model paths, attack params, scoring).
     judge:
-        Optional custom judge implementing BaseJudge. When provided, replaces
-        the judge specified in config.scoring.judge_model.
+        Optional custom judge implementing BaseJudge. When provided,
+        overrides the judge_model in config.scoring.
     """
 
-    def __init__(
-        self,
-        config: DJAConfig,
-        judge: Optional[BaseJudge] = None,
-    ):
+    def __init__(self, config: DJAConfig, judge: Optional[BaseJudge] = None):
         self.config = config
         self._custom_judge = judge
-        self._attacker: Optional[DynamicTemperatureAttacker] = None
+        self._attacker: Optional[Any] = None          # DynamicTemperatureAttacker, lazy
+        self._detect_degeneracy: Optional[Any] = None  # loaded alongside attacker
+        self._compute_composite: Optional[Any] = None
 
     # ── Lazy initialisation ─────────────────────────────────────────────────
 
     def _ensure_loaded(self) -> None:
+        """Load model weights.  Called automatically on first use."""
         if self._attacker is not None:
             return
+
+        import sys
+        import torch
+
+        _src = Path(__file__).resolve().parents[2] / "src"
+        if str(_src) not in sys.path:
+            sys.path.insert(0, str(_src))
+
+        from attacker_v3 import (  # noqa: E402
+            DynamicTemperatureAttacker,
+            compute_composite_score_from_components,
+            detect_response_degeneracy,
+        )
+
+        self._detect_degeneracy = detect_response_degeneracy
+        self._compute_composite = compute_composite_score_from_components
+
+        _DTYPE_MAP = {
+            "float16": torch.float16,
+            "float32": torch.float32,
+            "float": torch.float32,
+            "bfloat16": torch.bfloat16,
+        }
+
         mc = self.config.model
         sc = self.config.scoring
         samp = self.config.sampling
         dtype = _DTYPE_MAP.get(mc.dtype, torch.bfloat16)
 
-        target_path = (
-            get_model_path(mc.target_model)
-            if mc.target_model in MODEL_NAME_TO_PATH
-            else mc.target_model
-        )
-        ref_model_key = mc.ref_model or mc.target_model
-        ref_path = (
-            get_model_path(ref_model_key)
-            if ref_model_key in MODEL_NAME_TO_PATH
-            else ref_model_key
-        )
+        target_path = _resolve_model_path(mc.target_model, mc.root_dir)
+        ref_model = mc.ref_model or mc.target_model
+        ref_path = _resolve_model_path(ref_model, mc.root_dir)
         judge_model = sc.judge_model if self._custom_judge is None else "gpt-4o-mini"
 
         self._attacker = DynamicTemperatureAttacker(
@@ -119,19 +147,22 @@ class DJAEvaluator:
         Parameters
         ----------
         prompts:
-            List of harmful prompts, or a path to a CSV file with a `goal` /
-            `harmful` column (e.g. AdvBench).
+            List of harmful prompts, or a path to a CSV file (AdvBench format).
         start_index / end_index:
-            Slice of the prompt list to evaluate (useful for parallel runs).
+            Slice of the prompt list (useful for parallel runs).
         save_path:
-            If given, intermediate results are written here as JSONL after
-            each prompt so progress is not lost on crash.
+            If given, intermediate results are written as JSONL after each
+            prompt so progress survives crashes.
         verbose:
             Print per-iteration loss details.
         """
         self._ensure_loaded()
 
         if isinstance(prompts, str):
+            import sys
+            _src = str(Path(__file__).resolve().parents[2] / "src")
+            if _src not in sys.path:
+                sys.path.insert(0, _src)
             from utils import load_target_set
             prompts = load_target_set(prompts)
 
@@ -150,11 +181,7 @@ class DJAEvaluator:
         results = [self._to_attack_result(r) for r in raw_results]
         return self._build_report(results)
 
-    def attack_single(
-        self,
-        prompt: str,
-        verbose: bool = False,
-    ) -> AttackResult:
+    def attack_single(self, prompt: str, verbose: bool = False) -> AttackResult:
         """Attack a single prompt and return a structured result."""
         self._ensure_loaded()
 
@@ -171,7 +198,7 @@ class DJAEvaluator:
         suffix_list = best_suffix if isinstance(best_suffix, list) else []
         suffix_str = suffix_list[0] if suffix_list else (best_suffix or "")
         response = response or ""
-        degen = detect_response_degeneracy(response)
+        degen = self._detect_degeneracy(response)
         threshold = self.config.scoring.success_threshold
 
         return AttackResult(
@@ -192,10 +219,7 @@ class DJAEvaluator:
         )
 
     def score(self, prompt: str, response: str) -> ResponseScore:
-        """Score an existing (prompt, response) pair without running the attack.
-
-        Useful for post-hoc evaluation of responses generated elsewhere.
-        """
+        """Score an existing (prompt, response) pair without running the attack."""
         self._ensure_loaded()
 
         if self._custom_judge is not None:
@@ -213,15 +237,15 @@ class DJAEvaluator:
             quality = self._attacker.score_response_quality(
                 response=response, prompt=prompt
             )
-            composite = compute_composite_score_from_components(
+            composite = self._compute_composite(
                 harm_score=harm,
                 quality_scores=quality,
                 weights=sc.composite_weights,
                 hard_gate=sc.enable_hard_gate,
-                degeneracy=detect_response_degeneracy(response) if sc.enable_hard_gate else None,
+                degeneracy=self._detect_degeneracy(response) if sc.enable_hard_gate else None,
             )
 
-        degen = detect_response_degeneracy(response)
+        degen = self._detect_degeneracy(response)
         return ResponseScore(
             harm_score=harm,
             quality_scores=quality,
@@ -263,7 +287,7 @@ class DJAEvaluator:
         suffix_list = raw.get("suffix") or [""]
         suffix_str = suffix_list[0] if isinstance(suffix_list, list) else suffix_list
         response = raw.get("response") or ""
-        degen = detect_response_degeneracy(response)
+        degen = self._detect_degeneracy(response)
         final_score = raw.get("best_final_score", 0.0)
         threshold = self.config.scoring.success_threshold
 

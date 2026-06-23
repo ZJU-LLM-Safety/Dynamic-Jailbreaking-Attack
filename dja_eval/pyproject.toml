@@ -1,21 +1,34 @@
 [project]
 name = "dja-redteam"
 version = "0.1.0"
-description = "Dynamic Jailbreaking Attack — white-box red-teaming evaluation package"
-requires-python = ">=3.12"
+description = "Dynamic Jailbreaking Attack (DJA) — white-box LLM red-teaming"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+keywords = ["llm", "red-team", "jailbreak", "adversarial", "safety", "alignment"]
+
+# Core deps: lightweight inference + data utilities.
+# torch is NOT listed here — install it separately with your CUDA variant first:
+#   pip install torch --index-url https://download.pytorch.org/whl/cu128
+# then: pip install dja-redteam[openai]
 dependencies = [
-    "torch>=2.7.0",
-    "transformers==4.49.0",
-    "openai>=2.29.0",
-    "python-dotenv>=1.2.2",
-    "tqdm>=4.67.3",
-    "pandas>=2.3.3",
-    "peft>=0.18.1",
+    "transformers>=4.40.0",
+    "peft>=0.10.0",
+    "python-dotenv>=1.0.0",
+    "tqdm>=4.65.0",
+    "pandas>=2.0.0",
 ]
+
+[project.optional-dependencies]
+openai    = ["openai>=1.0.0"]
+anthropic = ["anthropic>=0.20.0"]
+together  = ["together>=1.0.0"]
+# Convenience: all API judge backends (torch still separate)
+all = ["dja-redteam[openai,anthropic,together]"]
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
+# Only ship the dja/ package, not examples/
 packages = ["dja"]

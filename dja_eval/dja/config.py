@@ -13,12 +13,13 @@ class ModelConfig:
                     target_model (non-combined mode).
     """
 
-    target_model: str                     # model name key or absolute path
+    target_model: str                     # HuggingFace model ID or local path
     target_device: str = "cuda:0"         # gradient optimisation runs here
     ref_device: str = "cuda:1"            # reference sampling runs here
     judge_device: str = "cuda:0"
     dtype: str = "bfloat16"              # "float16" | "bfloat16" | "float32"
     ref_model: Optional[str] = None      # None → same as target_model
+    root_dir: Optional[str] = None       # if set, resolved as root_dir/target_model
 
 
 @dataclass
