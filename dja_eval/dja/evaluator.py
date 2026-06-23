@@ -79,14 +79,8 @@ class DJAEvaluator:
         if self._attacker is not None:
             return
 
-        import sys
         import torch
-
-        _src = Path(__file__).resolve().parents[2] / "src"
-        if str(_src) not in sys.path:
-            sys.path.insert(0, str(_src))
-
-        from attacker_v3 import (  # noqa: E402
+        from ._core.attacker_v3 import (
             DynamicTemperatureAttacker,
             compute_composite_score_from_components,
             detect_response_degeneracy,
@@ -159,11 +153,7 @@ class DJAEvaluator:
         self._ensure_loaded()
 
         if isinstance(prompts, str):
-            import sys
-            _src = str(Path(__file__).resolve().parents[2] / "src")
-            if _src not in sys.path:
-                sys.path.insert(0, _src)
-            from utils import load_target_set
+            from ._core.utils import load_target_set
             prompts = load_target_set(prompts)
 
         if end_index is None:
