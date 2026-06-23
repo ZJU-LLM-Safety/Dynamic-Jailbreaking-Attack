@@ -2182,7 +2182,7 @@ class DynamicTemperatureAttacker:
                     if _relative_change < inner_plateau_eps:
                         break
 
-                if verbose and (j + 1) % 50 == 0 or j == num_inner_iters - 1:
+                if verbose and ((j + 1) % 50 == 0 or j == num_inner_iters - 1):
                     print(
                         "Loss: ",
                         loss.item(),
