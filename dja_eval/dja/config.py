@@ -38,8 +38,8 @@ class AttackConfig:
     forward_response_length: int = 20    # target prefix length for CE loss
 
     # Suffix design
-    suffix_max_length: int = 5
-    suffix_init_length: Optional[int] = None   # None → fixed at suffix_max_length
+    suffix_max_length: int = 30
+    suffix_init_length: Optional[int] = 5      # start small, expand up to max
     suffix_expand_patience: int = 0            # 0 → dynamic expansion disabled
     suffix_expand_step: int = 5
     suffix_topk: int = 10

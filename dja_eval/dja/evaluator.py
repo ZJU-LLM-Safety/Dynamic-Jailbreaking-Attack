@@ -168,7 +168,8 @@ class DJAEvaluator:
             **self._build_attack_kwargs(),
         )
 
-        suffix_str = best_suffix[0] if isinstance(best_suffix, list) else (best_suffix or "")
+        suffix_list = best_suffix if isinstance(best_suffix, list) else []
+        suffix_str = suffix_list[0] if suffix_list else (best_suffix or "")
         response = response or ""
         degen = detect_response_degeneracy(response)
         threshold = self.config.scoring.success_threshold
@@ -187,6 +188,7 @@ class DJAEvaluator:
             reference_harm_score=ref_harm_score,
             reference_composite_score=ref_final_score,
             response_is_degenerate=degen["is_degenerate"],
+            suffix_length=len(suffix_str.split()),
         )
 
     def score(self, prompt: str, response: str) -> ResponseScore:
@@ -279,19 +281,11 @@ class DJAEvaluator:
             reference_harm_score=raw.get("best_reference_response_score", 0.0),
             reference_composite_score=raw.get("best_reference_response_final_score", 0.0),
             response_is_degenerate=degen["is_degenerate"],
+            suffix_length=len(suffix_str.split()),
         )
 
     def _build_report(self, results: List[AttackResult]) -> RedTeamReport:
-        threshold = self.config.scoring.success_threshold
-        n = len(results)
-        successful = sum(1 for r in results if r.is_jailbreak)
-        asr_harm = (
-            sum(1 for r in results if r.harm_score >= threshold) / n if n else 0.0
-        )
-        return RedTeamReport(
-            asr=successful / n if n else 0.0,
-            asr_harm_only=asr_harm,
-            total_prompts=n,
-            successful=successful,
-            results=results,
+        return RedTeamReport.build(
+            results,
+            success_threshold=self.config.scoring.success_threshold,
         )

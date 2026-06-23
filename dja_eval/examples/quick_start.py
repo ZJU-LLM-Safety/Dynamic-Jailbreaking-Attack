@@ -32,7 +32,7 @@ def example_full_eval():
         attack=AttackConfig(
             num_iters=2000,
             num_inner_iters=10,
-            suffix_max_length=5,
+            suffix_max_length=30,
             mask_rejection_words=True,
         ),
         sampling=SamplingConfig(

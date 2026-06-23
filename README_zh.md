@@ -166,7 +166,7 @@ python src/part1_noncombined_dta_runner.py \
 | `--num-inner-iters` | 10 | 每轮的优化更新步数（optimization update steps） |
 | `--sample-count` | 30 | 每轮外循环的初始参考采样数量 |
 | `--adaptive-sample` | 开启 | 攻击遇阻时自动扩展采样预算 |
-| `--suffix-max-length` | 5 | 对抗后缀最大长度（token 数） |
+| `--suffix-max-length` | 30 | 对抗后缀最大长度（token 数） |
 | `--suffix-init-length` | None | 动态扩展的初始后缀长度（None 表示固定长度） |
 | `--suffix-expand-patience` | 0 | 无改善多少轮后扩展后缀（0 表示禁用） |
 | `--use-quality-scoring` | 开启 | 启用综合有害性 + 质量评分 |
