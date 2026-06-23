@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DJA — Dynamic Jailbreaking Attack</title>
+  <meta name="description" content="DJA is a gradient-based jailbreak framework with dynamic target, suffix, and optimization strategy. 100% ASR on 25 open-weight LLMs." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Reset & Variables ──────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #ffffff;
+      --bg2:       #f8fafc;
+      --bg3:       #f1f5f9;
+      --border:    #e2e8f0;
+      --text:      #0f172a;
+      --text2:     #475569;
+      --text3:     #94a3b8;
+      --blue:      #2563eb;
+      --blue-light:#eff6ff;
+      --blue-dk:   #1d4ed8;
+      --red:       #dc2626;
+      --red-light: #fef2f2;
+      --green:     #16a34a;
+      --green-light:#f0fdf4;
+      --amber:     #d97706;
+      --code-bg:   #0f172a;
+      --radius:    10px;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,.07), 0 1px 2px rgba(0,0,0,.05);
+      --shadow-md: 0 4px 12px rgba(0,0,0,.08), 0 2px 4px rgba(0,0,0,.04);
+    }
+
+    html { scroll-behavior: smooth; }
+    body { font-family: 'Inter', system-ui, sans-serif; color: var(--text); background: var(--bg); line-height: 1.6; }
+
+    /* ── Utilities ──────────────────────────────────────────────────────────── */
+    .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+    .badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 500;
+      border: 1px solid var(--border); background: var(--bg2); color: var(--text2);
+      text-decoration: none; transition: border-color .15s, color .15s;
+    }
+    .badge:hover { border-color: var(--blue); color: var(--blue); }
+    .badge.blue  { background: var(--blue-light); color: var(--blue); border-color: #bfdbfe; }
+    .badge.green { background: var(--green-light); color: var(--green); border-color: #bbf7d0; }
+    .badge.red   { background: var(--red-light); color: var(--red); border-color: #fecaca; }
+
+    section { padding: 80px 0; }
+    section:nth-child(even) { background: var(--bg2); }
+
+    h2.section-title {
+      font-size: 30px; font-weight: 700; color: var(--text); margin-bottom: 8px;
+    }
+    p.section-sub { color: var(--text2); font-size: 16px; margin-bottom: 48px; max-width: 620px; }
+
+    /* ── Nav ────────────────────────────────────────────────────────────────── */
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(255,255,255,.92); backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-inner {
+      display: flex; align-items: center; justify-content: space-between;
+      height: 56px;
+    }
+    .nav-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+    .nav-logo-badge {
+      width: 30px; height: 30px; border-radius: 7px;
+      background: linear-gradient(135deg, #2563eb, #7c3aed);
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; font-weight: 800; font-size: 14px; letter-spacing: -.5px;
+    }
+    .nav-logo-text { font-weight: 700; font-size: 15px; color: var(--text); }
+    .nav-links { display: flex; align-items: center; gap: 6px; }
+    .nav-link {
+      padding: 6px 12px; border-radius: 7px; font-size: 13.5px; font-weight: 500;
+      color: var(--text2); text-decoration: none; transition: background .15s, color .15s;
+    }
+    .nav-link:hover { background: var(--bg3); color: var(--text); }
+    .nav-btn {
+      padding: 6px 14px; border-radius: 7px; font-size: 13.5px; font-weight: 600;
+      background: var(--text); color: #fff; text-decoration: none;
+      transition: background .15s;
+    }
+    .nav-btn:hover { background: #1e293b; }
+
+    /* ── Hero ───────────────────────────────────────────────────────────────── */
+    #hero { padding: 88px 0 72px; background: var(--bg); }
+    .hero-badges { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; }
+    .hero-title {
+      font-size: clamp(34px, 5vw, 54px); font-weight: 800; line-height: 1.12;
+      color: var(--text); letter-spacing: -.5px; margin-bottom: 20px;
+    }
+    .hero-title em { font-style: normal; color: var(--blue); }
+    .hero-desc {
+      font-size: 17px; color: var(--text2); max-width: 640px; margin-bottom: 32px; line-height: 1.7;
+    }
+    .hero-ctas { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 56px; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 10px 20px; border-radius: 9px; font-size: 14.5px; font-weight: 600;
+      text-decoration: none; transition: all .15s; border: 1.5px solid transparent;
+    }
+    .btn-primary { background: var(--blue); color: #fff; }
+    .btn-primary:hover { background: var(--blue-dk); }
+    .btn-secondary { background: var(--bg); color: var(--text); border-color: var(--border); }
+    .btn-secondary:hover { background: var(--bg3); border-color: #cbd5e1; }
+
+    .hero-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+    .stat-card {
+      background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 20px 22px;
+    }
+    .stat-num { font-size: 30px; font-weight: 800; color: var(--text); line-height: 1; }
+    .stat-num.green { color: var(--green); }
+    .stat-label { font-size: 13px; color: var(--text2); margin-top: 4px; line-height: 1.4; }
+
+    /* ── Method overview image ──────────────────────────────────────────────── */
+    .overview-img-wrap {
+      border-radius: 14px; border: 1px solid var(--border); overflow: hidden;
+      box-shadow: var(--shadow-md); margin-top: 48px;
+    }
+    .overview-img-wrap img { width: 100%; display: block; }
+    .overview-caption {
+      text-align: center; font-size: 13px; color: var(--text3); margin-top: 10px;
+    }
+
+    /* ── Method — 4 Dynamic mechanisms ─────────────────────────────────────── */
+    .method-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+    .method-card {
+      background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 28px 28px; box-shadow: var(--shadow-sm); transition: box-shadow .15s;
+    }
+    .method-card:hover { box-shadow: var(--shadow-md); }
+    .method-icon {
+      width: 42px; height: 42px; border-radius: 10px;
+      background: var(--blue-light); color: var(--blue);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; margin-bottom: 14px;
+    }
+    .method-title { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+    .method-tag-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
+    .method-tag-bad {
+      background: var(--red-light); color: var(--red); border: 1px solid #fecaca;
+      border-radius: 6px; padding: 3px 9px; font-size: 12px; font-weight: 500;
+    }
+    .method-tag-good {
+      background: var(--green-light); color: var(--green); border: 1px solid #bbf7d0;
+      border-radius: 6px; padding: 3px 9px; font-size: 12px; font-weight: 500;
+    }
+    .method-tag-blue {
+      background: var(--blue-light); color: var(--blue); border: 1px solid #bfdbfe;
+      border-radius: 6px; padding: 3px 9px; font-size: 12px; font-weight: 500;
+    }
+    .method-sep {
+      border: none; border-top: 1px solid var(--border); margin: 12px 0;
+    }
+    .method-desc { font-size: 13.5px; color: var(--text2); line-height: 1.6; margin-top: 6px; }
+
+    /* static template quote bubble */
+    .method-quote {
+      background: var(--red-light); border: 1px solid #fecaca;
+      border-left: 3px solid var(--red); border-radius: 7px;
+      padding: 9px 13px; font-size: 13px; color: #7f1d1d;
+      font-style: italic; margin: 14px 0 10px;
+    }
+
+    /* failure mode list */
+    .method-fail-list { display: flex; flex-direction: column; gap: 7px; margin: 14px 0 0; }
+    .method-fail-item { display: flex; align-items: flex-start; gap: 9px; }
+    .method-fail-dot {
+      width: 18px; height: 18px; border-radius: 50%;
+      background: var(--red-light); border: 1px solid #fecaca;
+      color: var(--red); font-size: 10px; font-weight: 800;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; margin-top: 1px;
+    }
+    .method-fail-text { font-size: 13px; color: var(--text2); line-height: 1.5; }
+    .method-fail-text strong { color: var(--text); font-weight: 600; }
+
+    /* 2×2 dynamic grid for card 3 */
+    .method-card.card-solution {
+      background: linear-gradient(145deg, #f0f9ff 0%, #f0fdf4 100%);
+      border-color: #bfdbfe;
+    }
+    .method-dyn-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px;
+    }
+    .method-dyn-item {
+      background: rgba(255,255,255,.8); border: 1px solid var(--border);
+      border-radius: 8px; padding: 11px 13px;
+    }
+    .method-dyn-icon { font-size: 16px; line-height: 1; margin-bottom: 5px; }
+    .method-dyn-label { font-size: 12.5px; font-weight: 700; color: var(--text); }
+    .method-dyn-sub { font-size: 11.5px; color: var(--text2); margin-top: 2px; line-height: 1.4; }
+
+    /* ── Multi-objective scoring ────────────────────────────────────────────── */
+
+    /* comparison table */
+    .cmp-table {
+      width: 100%; border-radius: var(--radius); overflow: hidden;
+      border: 1px solid var(--border); margin-bottom: 48px;
+    }
+    .cmp-head {
+      display: grid; grid-template-columns: 140px 1fr 1fr;
+      background: var(--bg3); border-bottom: 1px solid var(--border);
+    }
+    .cmp-head-cell {
+      padding: 10px 20px; font-size: 12px; font-weight: 700;
+      letter-spacing: .06em; text-transform: uppercase;
+    }
+    .cmp-head-cell.old { color: var(--red); }
+    .cmp-head-cell.new { color: var(--green); }
+    .cmp-body-row {
+      display: grid; grid-template-columns: 140px 1fr 1fr;
+      border-bottom: 1px solid var(--border);
+    }
+    .cmp-body-row:last-child { border-bottom: none; }
+    .cmp-aspect {
+      padding: 16px 20px; font-size: 12px; font-weight: 700;
+      letter-spacing: .04em; text-transform: uppercase; color: var(--text3);
+      background: var(--bg3); border-right: 1px solid var(--border);
+      display: flex; align-items: center;
+    }
+    .cmp-old, .cmp-new {
+      padding: 16px 20px; font-size: 14px; display: flex;
+      align-items: center; gap: 9px; line-height: 1.4;
+    }
+    .cmp-old { background: var(--red-light); color: #7f1d1d; border-right: 1px solid #fecaca; }
+    .cmp-new { background: var(--green-light); color: #14532d; }
+    .cmp-x { font-size: 13px; font-weight: 800; color: var(--red); flex-shrink: 0; }
+    .cmp-check { font-size: 13px; font-weight: 800; color: var(--green); flex-shrink: 0; }
+
+    /* dimension pills row */
+    .dims-grid {
+      display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px;
+    }
+    .dim-card {
+      border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 22px 14px 18px; background: var(--bg);
+      display: flex; flex-direction: column; align-items: center;
+      gap: 8px; text-align: center; box-shadow: var(--shadow-sm);
+      transition: box-shadow .15s, transform .15s;
+    }
+    .dim-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+    .dim-card.dim-primary { background: var(--red-light); border-color: #fecaca; }
+    .dim-emoji { font-size: 28px; line-height: 1; }
+    .dim-name { font-size: 13.5px; font-weight: 700; color: var(--text); }
+    .dim-card.dim-primary .dim-name { color: #991b1b; }
+    .dim-tag {
+      font-size: 10.5px; font-weight: 600; letter-spacing: .05em;
+      text-transform: uppercase; padding: 2px 8px; border-radius: 99px;
+    }
+    .dim-card.dim-primary .dim-tag { background: #fecaca; color: #b91c1c; }
+    .dim-card:not(.dim-primary) .dim-tag { background: var(--blue-light); color: var(--blue); }
+
+    /* ── Results ────────────────────────────────────────────────────────────── */
+    .asr-banner {
+      display: flex; align-items: center; gap: 20px;
+      background: var(--green-light); border: 1px solid #86efac;
+      border-radius: var(--radius); padding: 20px 28px; margin-bottom: 40px;
+    }
+    .asr-num { font-size: 48px; font-weight: 800; color: var(--green); line-height: 1; }
+    .asr-meta { font-size: 14px; color: #166534; }
+    .asr-meta strong { display: block; font-size: 16px; margin-bottom: 2px; color: #15803d; }
+
+    .family-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .family-card {
+      background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 22px; box-shadow: var(--shadow-sm);
+    }
+    .family-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+    .family-name { font-size: 15px; font-weight: 700; color: var(--text); }
+    .family-org  { font-size: 11px; color: var(--text3); font-weight: 500; margin-top: 1px; }
+    .family-asr  { font-size: 13px; font-weight: 700; color: var(--green); background: var(--green-light);
+                   padding: 2px 8px; border-radius: 6px; }
+    .model-list { display: flex; flex-direction: column; gap: 5px; }
+    .model-row  { display: flex; justify-content: space-between; align-items: center;
+                  font-size: 13px; color: var(--text2); padding: 4px 0;
+                  border-bottom: 1px solid var(--bg3); }
+    .model-row:last-child { border-bottom: none; }
+    .model-size { font-weight: 600; color: var(--text); font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+    .model-check { color: var(--green); font-size: 13px; }
+
+    .results-note { margin-top: 24px; font-size: 13px; color: var(--text3); }
+    .results-note a { color: var(--blue); text-decoration: none; }
+    .results-note a:hover { text-decoration: underline; }
+
+    /* ── Quick Start ────────────────────────────────────────────────────────── */
+    .qs-steps { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    .qs-step { display: flex; flex-direction: column; gap: 10px; }
+    .qs-step-label {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 14px; font-weight: 600; color: var(--text);
+    }
+    .qs-num {
+      width: 24px; height: 24px; border-radius: 50%;
+      background: var(--blue); color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 700; flex-shrink: 0;
+    }
+    pre.code-block {
+      background: var(--code-bg); border-radius: 9px; padding: 18px 20px;
+      font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 1.7;
+      color: #e2e8f0; overflow-x: auto; white-space: pre;
+    }
+    .qs-full { grid-column: 1 / -1; }
+    .tok-comment { color: #64748b; }
+    .tok-cmd     { color: #86efac; }
+    .tok-flag    { color: #93c5fd; }
+    .tok-val     { color: #fde68a; }
+    .tok-str     { color: #f9a8d4; }
+
+    /* ── Degeneracy note ────────────────────────────────────────────────────── */
+    .degen-banner {
+      display: flex; gap: 16px; align-items: flex-start;
+      background: var(--bg2); border: 1px solid var(--border);
+      border-left: 3px solid var(--amber); border-radius: var(--radius);
+      padding: 18px 20px; margin-top: 32px;
+    }
+    .degen-icon { font-size: 20px; flex-shrink: 0; margin-top: 1px; }
+    .degen-text { font-size: 14px; color: var(--text2); line-height: 1.6; }
+    .degen-text strong { color: var(--text); }
+
+    /* ── Citation ───────────────────────────────────────────────────────────── */
+    #citation pre.code-block { background: #0f172a; }
+    .bib-key    { color: #93c5fd; }
+    .bib-field  { color: #86efac; }
+    .bib-val    { color: #fde68a; }
+    .bib-brace  { color: #94a3b8; }
+
+    /* ── Footer ─────────────────────────────────────────────────────────────── */
+    footer {
+      background: var(--code-bg); color: #94a3b8; padding: 40px 0;
+      font-size: 13.5px;
+    }
+    .footer-inner {
+      display: flex; justify-content: space-between; align-items: center;
+      flex-wrap: wrap; gap: 16px;
+    }
+    .footer-name { font-weight: 700; color: #e2e8f0; font-size: 15px; }
+    .footer-authors { margin-top: 4px; font-size: 12.5px; }
+    .footer-links { display: flex; gap: 20px; }
+    .footer-link { color: #64748b; text-decoration: none; transition: color .15s; }
+    .footer-link:hover { color: #e2e8f0; }
+
+    /* ── Responsive ─────────────────────────────────────────────────────────── */
+    @media (max-width: 768px) {
+      .hero-stats { grid-template-columns: 1fr 1fr; }
+      .method-grid { grid-template-columns: 1fr; }
+      .method-tag-row { flex-wrap: wrap; }
+      .cmp-head, .cmp-body-row { grid-template-columns: 90px 1fr 1fr; }
+      .dims-grid { grid-template-columns: repeat(3, 1fr); }
+      .score-grid { grid-template-columns: 1fr; }
+      .family-grid { grid-template-columns: 1fr 1fr; }
+      .qs-steps { grid-template-columns: 1fr; }
+      .nav-links .nav-link { display: none; }
+      .footer-inner { flex-direction: column; align-items: flex-start; }
+    }
+    @media (max-width: 480px) {
+      .hero-stats { grid-template-columns: 1fr; }
+      .family-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Navigation ──────────────────────────────────────────────────────────── -->
+<nav>
+  <div class="container nav-inner">
+    <a href="#" class="nav-logo">
+      <div class="nav-logo-badge">D</div>
+      <span class="nav-logo-text">DJA</span>
+    </a>
+    <div class="nav-links">
+      <a href="#method"    class="nav-link">Method</a>
+      <a href="#results"   class="nav-link">Results</a>
+      <a href="#quickstart" class="nav-link">Quick Start</a>
+      <a href="#citation"  class="nav-link">Citation</a>
+      <a href="https://arxiv.org/abs/2510.02422" target="_blank" class="nav-link">Paper ↗</a>
+      <a href="https://github.com/Jus1mple/Dynamic-Target-Prompt-Attacker" target="_blank" class="nav-btn">GitHub</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ── Hero ────────────────────────────────────────────────────────────────── -->
+<section id="hero">
+  <div class="container">
+    <div class="hero-badges">
+      <a href="https://arxiv.org/abs/2510.02422" target="_blank" class="badge blue">📄 arXiv 2510.02422</a>
+      <span class="badge green">✓ 100% ASR · 25 Models</span>
+      <span class="badge">Python 3.10+</span>
+      <span class="badge">MIT License</span>
+    </div>
+
+    <h1 class="hero-title">
+      <em>Dynamic</em> Jailbreaking Attack<br/>for Safety-Aligned LLMs
+    </h1>
+    <p class="hero-desc">
+      A gradient-based red-teaming framework that replaces the static optimization target,
+      suffix length, and sampling budget of existing attacks with fully dynamic counterparts —
+      achieving <strong>100% ASR across 25 open-weight models (0.5B–32B)</strong>
+      spanning 7 model families on AdvBench-100.
+    </p>
+
+    <div class="hero-ctas">
+      <a href="https://arxiv.org/abs/2510.02422" target="_blank" class="btn btn-primary">📄 Read the Paper</a>
+      <a href="https://github.com/Jus1mple/Dynamic-Target-Prompt-Attacker" target="_blank" class="btn btn-secondary">⭐ View on GitHub</a>
+      <a href="#quickstart" class="btn btn-secondary">🚀 Quick Start</a>
+    </div>
+
+    <div class="hero-stats">
+      <div class="stat-card">
+        <div class="stat-num green">100%</div>
+        <div class="stat-label">ASR on all evaluated<br/>white-box models</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num">25</div>
+        <div class="stat-label">Open-weight models tested<br/>0.5B – 32B parameters</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num">7</div>
+        <div class="stat-label">Model families covered<br/>Gemma · Llama · Mistral · Qwen</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num">5</div>
+        <div class="stat-label">Scoring dimensions<br/>harm + 4 quality axes</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── Method ───────────────────────────────────────────────────────────────── -->
+<section id="method">
+  <div class="container">
+    <h2 class="section-title">Why Static Attacks Fall Short</h2>
+    <p class="section-sub">
+      Existing gradient-based jailbreaks fix the optimization target, suffix length, and sampling budget
+      before the attack begins. Each choice introduces a distinct failure mode that DJA resolves dynamically.
+    </p>
+
+    <div class="method-grid">
+
+      <!-- Card 1: Static Target Pathology -->
+      <div class="method-card">
+        <div class="method-icon">🎯</div>
+        <div class="method-title">Static Target is Flawed by Construction</div>
+        <div class="method-tag-row">
+          <span class="method-tag-bad">Low-probability</span>
+          <span class="method-tag-bad">Low-risk</span>
+          <span class="method-tag-bad">Prompt-unrelated</span>
+        </div>
+        <div class="method-quote">"Sure, here is how to…"</div>
+        <div class="method-desc">
+          This predefined template sits outside the model's natural output distribution,
+          forcing gradients to chase an unlikely pattern that is semantically disconnected
+          from the actual harmful intent.
+        </div>
+      </div>
+
+      <!-- Card 2: Affirmative Prefix Failure Modes -->
+      <div class="method-card">
+        <div class="method-icon">💬</div>
+        <div class="method-title">Affirmative Prefix Misdirects the Model</div>
+        <div class="method-tag-row">
+          <span class="method-tag-bad">Intent-unrelated output</span>
+          <span class="method-tag-bad">Affirm-then-refuse</span>
+        </div>
+        <div class="method-fail-list">
+          <div class="method-fail-item">
+            <div class="method-fail-dot">1</div>
+            <div class="method-fail-text"><strong>Off-topic response</strong> — model complies with the surface form but generates content unrelated to the harmful intent.</div>
+          </div>
+          <div class="method-fail-item">
+            <div class="method-fail-dot">2</div>
+            <div class="method-fail-text"><strong>Implicit refusal</strong> — "Sure!" in the first sentence, rejection embedded in the next. Neither is caught by harm-only matching.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 3: All-Dynamic Optimization -->
+      <div class="method-card card-solution">
+        <div class="method-icon" style="background:var(--blue-light);color:var(--blue);">⚙️</div>
+        <div class="method-title">DJA: Fully Dynamic Optimization</div>
+        <div class="method-tag-row">
+          <span class="method-tag-good">Dynamic target</span>
+          <span class="method-tag-blue">Dynamic sampling</span>
+          <span class="method-tag-blue">Dynamic suffix</span>
+          <span class="method-tag-blue">Dynamic iterations</span>
+        </div>
+        <div class="method-dyn-grid">
+          <div class="method-dyn-item">
+            <div class="method-dyn-icon">🔄</div>
+            <div class="method-dyn-label">Target</div>
+            <div class="method-dyn-sub">Tracks the model's evolving behavior — never chases a stale template</div>
+          </div>
+          <div class="method-dyn-item">
+            <div class="method-dyn-icon">📦</div>
+            <div class="method-dyn-label">Sampling budget</div>
+            <div class="method-dyn-sub">Easy prompts stay cheap; hard ones get deeper exploration automatically</div>
+          </div>
+          <div class="method-dyn-item">
+            <div class="method-dyn-icon">📏</div>
+            <div class="method-dyn-label">Suffix capacity</div>
+            <div class="method-dyn-sub">Expands only where the prompt demands it — no wasted token budget</div>
+          </div>
+          <div class="method-dyn-item">
+            <div class="method-dyn-icon">⚡</div>
+            <div class="method-dyn-label">Inner iterations</div>
+            <div class="method-dyn-sub">Stops as soon as the gradient converges — no redundant compute</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="overview-img-wrap" style="margin-top: 48px;">
+      <img src="DJA_overview_02.png" alt="DJA architecture overview" />
+    </div>
+    <p class="overview-caption">Figure: DJA algorithm overview. Dynamic components are highlighted in blue.</p>
+  </div>
+</section>
+
+<!-- ── Multi-objective Scoring ──────────────────────────────────────────────── -->
+<section id="scoring">
+  <div class="container">
+    <h2 class="section-title">Multi-Objective Candidate Selection</h2>
+    <p class="section-sub">
+      Existing attacks select the optimization target by a fixed template or a single harm score.
+      DJA samples candidates from the model's current distribution and ranks them jointly on
+      <strong>harmfulness and four quality dimensions</strong> — ensuring the selected target
+      is both dangerous and semantically meaningful.
+    </p>
+
+    <!-- Comparison table -->
+    <div class="cmp-table">
+      <div class="cmp-head">
+        <div class="cmp-head-cell"></div>
+        <div class="cmp-head-cell old">Previous Approaches</div>
+        <div class="cmp-head-cell new">DJA</div>
+      </div>
+
+      <div class="cmp-body-row">
+        <div class="cmp-aspect">Target</div>
+        <div class="cmp-old"><span class="cmp-x">✗</span> Fixed "Sure, here is how to…" template</div>
+        <div class="cmp-new"><span class="cmp-check">✓</span> Sampled from model's current distribution</div>
+      </div>
+
+      <div class="cmp-body-row">
+        <div class="cmp-aspect">Judge</div>
+        <div class="cmp-old"><span class="cmp-x">✗</span> Harm score only — passes incoherent output</div>
+        <div class="cmp-new"><span class="cmp-check">✓</span> 5-dim composite: harm + 4 quality axes</div>
+      </div>
+
+      <div class="cmp-body-row">
+        <div class="cmp-aspect">Filter</div>
+        <div class="cmp-old"><span class="cmp-x">✗</span> No quality check — degenerate text counts</div>
+        <div class="cmp-new"><span class="cmp-check">✓</span> Degeneracy gate zeroes loops &amp; empty outputs</div>
+      </div>
+    </div>
+
+    <!-- Five dimensions -->
+    <div class="dims-grid">
+
+      <div class="dim-card dim-primary">
+        <div class="dim-emoji">⚠️</div>
+        <div class="dim-name">Harmfulness</div>
+        <div class="dim-tag">Primary</div>
+      </div>
+
+      <div class="dim-card">
+        <div class="dim-emoji">🎯</div>
+        <div class="dim-name">Specificity</div>
+        <div class="dim-tag">On-target</div>
+      </div>
+
+      <div class="dim-card">
+        <div class="dim-emoji">🔗</div>
+        <div class="dim-name">Relevance</div>
+        <div class="dim-tag">Semantic</div>
+      </div>
+
+      <div class="dim-card">
+        <div class="dim-emoji">💬</div>
+        <div class="dim-name">Coherence</div>
+        <div class="dim-tag">Fluency</div>
+      </div>
+
+      <div class="dim-card">
+        <div class="dim-emoji">🚫</div>
+        <div class="dim-name">Non-refusal</div>
+        <div class="dim-tag">Compliance</div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ── Results ──────────────────────────────────────────────────────────────── -->
+<section id="results">
+  <div class="container">
+    <h2 class="section-title">Main Results</h2>
+    <p class="section-sub">
+      Evaluated on <strong>AdvBench-100</strong> using a GPT-4o-mini multi-objective scorer
+      (composite threshold ≥ 0.5). DJA achieves perfect ASR across all 25 evaluated open-weight models.
+    </p>
+
+    <div class="asr-banner">
+      <div class="asr-num">100%</div>
+      <div class="asr-meta">
+        <strong>Attack Success Rate — across all 25 models</strong>
+        DJA consistently outperforms gradient-based baselines including GCG,
+        indicating that static formulations substantially underestimate LLM vulnerability
+        to adaptive attacks.
+      </div>
+    </div>
+
+    <div class="family-grid">
+
+      <!-- Gemma -->
+      <div class="family-card">
+        <div class="family-header">
+          <div>
+            <div class="family-name">Gemma</div>
+            <div class="family-org">Google</div>
+          </div>
+          <div class="family-asr">2 models</div>
+        </div>
+        <div class="model-list">
+          <div class="model-row"><span>Gemma</span><span class="model-size">7B</span><span class="model-check">✓ 100%</span></div>
+          <div class="model-row"><span>Gemma2</span><span class="model-size">2B</span><span class="model-check">✓ 100%</span></div>
+        </div>
+      </div>
+
+      <!-- Llama -->
+      <div class="family-card">
+        <div class="family-header">
+          <div>
+            <div class="family-name">Llama 3</div>
+            <div class="family-org">Meta</div>
+          </div>
+          <div class="family-asr">2 models</div>
+        </div>
+        <div class="model-list">
+          <div class="model-row"><span>Llama 3</span><span class="model-size">8B</span><span class="model-check">✓ 100%</span></div>
+          <div class="model-row"><span>Llama 3.2</span><span class="model-size">3B</span><span class="model-check">✓ 100%</span></div>
+        </div>
+      </div>
+
+      <!-- Mistral -->
+      <div class="family-card">
+        <div class="family-header">
+          <div>
+            <div class="family-name">Mistral</div>
+            <div class="family-org">Mistral AI</div>
+          </div>
+          <div class="family-asr">3 models</div>
+        </div>
+        <div class="model-list">
+          <div class="model-row"><span>Mistral v0.3</span><span class="model-size">7B</span><span class="model-check">✓ 100%</span></div>
+          <div class="model-row"><span>Mistral-Nemo</span><span class="model-size">12B</span><span class="model-check">✓ 100%</span></div>
+          <div class="model-row"><span>Mistral-Small</span><span class="model-size">24B</span><span class="model-check">✓ 100%</span></div>
+        </div>
+      </div>
+
+      <!-- Qwen2.5 -->
+      <div class="family-card">
+        <div class="family-header">
+          <div>
+            <div class="family-name">Qwen2.5</div>
+            <div class="family-org">Alibaba</div>
+          </div>
+          <div class="family-asr">6 models</div>
+        </div>
+        <div class="model-list">
+          <div class="model-row"><span>Qwen2.5</span><span class="model-size">0.5B</span><span class="model-check">✓ 100%</span></div>
+          <div class="model-row"><span>Qwen2.5</span><span class="model-size">1.5B</span><span class="model-check">✓ 100%</span></div>
+          <div class="model-row"><span>Qwen2.5</span><span class="model-size">3B</span><span class="model-check">✓ 100%</span></div>
+          <div class="model-row"><span>Qwen2.5</span><span class="model-size">7B</span><span class="model-check">✓ 100%</span></div>
+          <div class="model-row"><span>Qwen2.5</span><span class="model-size">14B</span><span class="model-check">✓ 100%</span></div>
+          <div class="model-row"><span>Qwen2.5</span><span class="model-size">32B</span><span class="model-check">✓ 100%</span></div>
+        </div>
+      </div>
+
+      <!-- Qwen3 -->
+      <div class="family-card">
+        <div class="family-header">
+          <div>
+            <div class="family-name">Qwen3</div>
+            <div class="family-org">Alibaba</div>
+          </div>
+          <div class="family-asr">7 models</div>
+        </div>
+        <div class="model-list">
+          <div class="model-row"><span>Qwen3</span><span class="model-size">0.6B</span><span class="model-check">✓ 100%</span></div>
+          <div class="model-row"><span>Qwen3</span><span class="model-size">1.7B</span><span class="model-check">✓ 100%</span></div>
+          <div class="model-row"><span>Qwen3</span><span class="model-size">4B</span><span class="model-check">✓ 100%</span></div>
+          <div class="model-row"><span>Qwen3</span><span class="model-size">8B</span><span class="model-check">✓ 100%</span></div>
+          <div class="model-row"><span>Qwen3</span><span class="model-size">14B</span><span class="model-check">✓ 100%</span></div>
+          <div class="model-row"><span>Qwen3</span><span class="model-size">30B</span><span class="model-check">✓ 100%</span></div>
+          <div class="model-row"><span>Qwen3</span><span class="model-size">32B</span><span class="model-check">✓ 100%</span></div>
+        </div>
+      </div>
+
+      <!-- Qwen3.5 + GPT-OSS -->
+      <div style="display:flex;flex-direction:column;gap:16px;">
+        <div class="family-card">
+          <div class="family-header">
+            <div>
+              <div class="family-name">Qwen3.5</div>
+              <div class="family-org">Alibaba</div>
+            </div>
+            <div class="family-asr">4 models</div>
+          </div>
+          <div class="model-list">
+            <div class="model-row"><span>Qwen3.5</span><span class="model-size">0.8B</span><span class="model-check">✓ 100%</span></div>
+            <div class="model-row"><span>Qwen3.5</span><span class="model-size">2B</span><span class="model-check">✓ 100%</span></div>
+            <div class="model-row"><span>Qwen3.5</span><span class="model-size">4B</span><span class="model-check">✓ 100%</span></div>
+            <div class="model-row"><span>Qwen3.5</span><span class="model-size">9B</span><span class="model-check">✓ 100%</span></div>
+          </div>
+        </div>
+        <div class="family-card">
+          <div class="family-header">
+            <div>
+              <div class="family-name">GPT-OSS</div>
+              <div class="family-org">OpenAI</div>
+            </div>
+            <div class="family-asr">1 model</div>
+          </div>
+          <div class="model-list">
+            <div class="model-row"><span>GPT-OSS</span><span class="model-size">20B</span><span class="model-check">✓ 100%</span></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <p class="results-note">
+      All results measured on AdvBench-100. Scorer: GPT-4o-mini multi-objective judge, composite threshold ≥ 0.5.
+      Post-hoc degeneracy gating applied to all reported ASR figures.
+      See <a href="https://arxiv.org/abs/2510.02422">the paper</a> for full experimental details and baseline comparisons.
+    </p>
+  </div>
+</section>
+
+<!-- ── Quick Start ──────────────────────────────────────────────────────────── -->
+<section id="quickstart">
+  <div class="container">
+    <h2 class="section-title">Quick Start</h2>
+    <p class="section-sub">Get DJA running against a local model in three steps.</p>
+
+    <div class="qs-steps">
+
+      <!-- Step 1 -->
+      <div class="qs-step">
+        <div class="qs-step-label"><span class="qs-num">1</span> Install</div>
+        <pre class="code-block"><span class="tok-cmd">pip</span> install dja-redteam
+
+<span class="tok-comment"># or from source</span>
+<span class="tok-cmd">git</span> clone https://github.com/Jus1mple/\
+  Dynamic-Target-Prompt-Attacker.git
+<span class="tok-cmd">uv</span> pip install <span class="tok-flag">-e</span> dja_eval</pre>
+      </div>
+
+      <!-- Step 2 -->
+      <div class="qs-step">
+        <div class="qs-step-label"><span class="qs-num">2</span> Set scorer API key</div>
+        <pre class="code-block"><span class="tok-cmd">export</span> <span class="tok-flag">OPENAI_API_KEY</span>=<span class="tok-str">sk-...</span>
+
+<span class="tok-comment"># custom OpenAI-compatible endpoint</span>
+<span class="tok-cmd">export</span> <span class="tok-flag">JUDGE_BASE_URL</span>=<span class="tok-str">https://your-api/v1</span>
+<span class="tok-cmd">export</span> <span class="tok-flag">JUDGE_MODEL</span>=<span class="tok-str">gpt-4o-mini</span></pre>
+      </div>
+
+      <!-- Step 3: full width -->
+      <div class="qs-step qs-full">
+        <div class="qs-step-label"><span class="qs-num">3</span> Run &amp; monitor</div>
+        <pre class="code-block"><span class="tok-comment"># launch attack — results stream to ./dja-results/</span>
+<span class="tok-cmd">dja</span> eval \
+  <span class="tok-flag">--model</span>         <span class="tok-val">Qwen/Qwen2.5-7B-Instruct</span> \
+  <span class="tok-flag">--root-dir</span>      <span class="tok-val">/path/to/models</span>          \
+  <span class="tok-flag">--target-device</span> <span class="tok-val">cuda:0</span>                   \
+  <span class="tok-flag">--ref-device</span>    <span class="tok-val">cuda:1</span>                   \
+  <span class="tok-flag">--prompts</span>       <span class="tok-val">data/raw/advbench_100.csv</span>
+
+<span class="tok-comment"># open live dashboard in browser</span>
+<span class="tok-cmd">dja</span> serve ./dja-results</pre>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ── Citation ─────────────────────────────────────────────────────────────── -->
+<section id="citation">
+  <div class="container">
+    <h2 class="section-title">Citation</h2>
+    <p class="section-sub">
+      If you use DJA in your research, please cite the following paper.
+    </p>
+    <pre class="code-block">
+<span class="bib-brace">@article{</span><span class="bib-key">xiu2025dynamic</span>,
+  <span class="bib-field">title</span>   = {<span class="bib-val">Dynamic Target Attack</span>},
+  <span class="bib-field">author</span>  = {<span class="bib-val">Xiu, Kedong and Zeng, Churui and Zheng, Tianhang and
+             Huang, Xinzhe and Jia, Xiaojun and Wang, Di and
+             Zhao, Puning and Qin, Zhan and Ren, Kui</span>},
+  <span class="bib-field">journal</span> = {<span class="bib-val">arXiv preprint arXiv:2510.02422</span>},
+  <span class="bib-field">year</span>    = {<span class="bib-val">2025</span>},
+<span class="bib-brace">}</span></pre>
+
+    <div style="margin-top: 28px; padding: 18px 20px; background: var(--bg2);
+         border: 1px solid var(--border); border-radius: var(--radius);
+         font-size: 13.5px; color: var(--text2); line-height: 1.7;">
+      <strong style="color:var(--text);">Ethical Statement.</strong>
+      This work is intended for academic research into the safety and robustness of language models.
+      All experiments were conducted in a controlled research environment.
+      The attack code and results are released to support the development of more robust defenses.
+      We do not endorse any malicious use of this work.
+    </div>
+  </div>
+</section>
+
+<!-- ── Footer ───────────────────────────────────────────────────────────────── -->
+<footer>
+  <div class="container footer-inner">
+    <div>
+      <div class="footer-name">Dynamic Jailbreaking Attack (DJA)</div>
+      <div class="footer-authors">
+        Kedong Xiu · Churui Zeng · Tianhang Zheng · Xinzhe Huang ·
+        Xiaojun Jia · Di Wang · Puning Zhao · Zhan Qin · Kui Ren
+      </div>
+    </div>
+    <div class="footer-links">
+      <a href="https://arxiv.org/abs/2510.02422" target="_blank" class="footer-link">arXiv</a>
+      <a href="https://github.com/Jus1mple/Dynamic-Target-Prompt-Attacker" target="_blank" class="footer-link">GitHub</a>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
