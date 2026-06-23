@@ -82,7 +82,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--learning-rate", type=float, default=1.5)
     parser.add_argument("--response-length", type=int, default=256)
     parser.add_argument("--forward-response-length", type=int, default=20)
-    parser.add_argument("--suffix-max-length", type=int, default=20)
+    parser.add_argument("--suffix-max-length", type=int, default=5)
     parser.add_argument("--suffix-init-length", type=int, default=None,
                         help="Starting suffix length. Defaults to --suffix-max-length (static).")
     parser.add_argument("--suffix-expand-patience", type=int, default=0,
