@@ -159,6 +159,8 @@ class DJAEvaluator:
         start_index: int = 0,
         end_index: Optional[int] = None,
         save_path: Optional[str] = None,
+        results_dir: Optional[str] = None,
+        run_name: Optional[str] = None,
         verbose: bool = False,
         show_progress: bool = True,
     ) -> RedTeamReport:
@@ -173,6 +175,12 @@ class DJAEvaluator:
         save_path:
             If given, intermediate results are written as JSONL after each
             prompt so progress survives crashes.
+        results_dir:
+            If given, create a structured ``dja-results/`` directory with live
+            status updates (for the web dashboard), per-run JSONL/JSON output,
+            and a leaderboard manifest (``index.json``).
+        run_name:
+            Display name for this run in the dashboard (default: model short name).
         verbose:
             Print per-iteration loss/score details from the inner attack loop.
         show_progress:
@@ -211,20 +219,44 @@ class DJAEvaluator:
         if show_progress:
             _cli.print_attack_start(n)
 
+        # ── Results store (web dashboard) ────────────────────────────────────
+        _store = None
+        _raw_path = save_path
+        if results_dir is not None:
+            from ._results import ResultsStore
+            _store = ResultsStore(results_dir)
+            _store.init_run(self.config, total=n, run_name=run_name)
+            _raw_path = _store.raw_save_path()
+            _store.start_watcher()
+            if show_progress:
+                print(f"  {_cli.dim('▶')} Dashboard → {results_dir}/index.html")
+                print()
+
         # ── Run attack ───────────────────────────────────────────────────────
         t_attack = _time.time()
-        raw_results = self._attacker.attack(
-            target_set=prompts,
-            start_index=start_index,
-            end_index=end_index,
-            save_path=save_path,
-            verbose=verbose,
-            **self._build_attack_kwargs(),
-        )
+        try:
+            raw_results = self._attacker.attack(
+                target_set=prompts,
+                start_index=start_index,
+                end_index=end_index,
+                save_path=_raw_path,
+                verbose=verbose,
+                **self._build_attack_kwargs(),
+            )
+        finally:
+            if _store is not None:
+                _store.stop_watcher()
         t_done = _time.time()
 
         results = [self._to_attack_result(r) for r in raw_results]
         report = self._build_report(results)
+
+        # ── Persist to results store ─────────────────────────────────────────
+        if _store is not None:
+            _store.finalize(results, report)
+            # also honour save_path if both were given
+            if save_path is not None and save_path != _raw_path:
+                report.to_jsonl(save_path)
 
         # ── Visual output ────────────────────────────────────────────────────
         if show_progress:

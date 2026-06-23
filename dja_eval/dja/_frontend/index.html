@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DJA — Evaluation Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+/* ── reset + tokens ─────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#fff;--surface:#f8fafc;--surface2:#f1f5f9;
+  --border:#e2e8f0;--border2:#cbd5e1;
+  --primary:#2563eb;--primary-lt:#dbeafe;--primary-dk:#1d4ed8;
+  --success:#16a34a;--success-lt:#f0fdf4;
+  --danger:#dc2626;--danger-lt:#fef2f2;
+  --warn:#d97706;
+  --txt:#0f172a;--txt2:#475569;--txt3:#94a3b8;
+  --mono:"SF Mono","Fira Code",Consolas,monospace;
+  --r:6px;--r2:10px;
+  --shadow:0 1px 3px rgba(0,0,0,.07),0 1px 2px rgba(0,0,0,.04);
+  --shadow2:0 4px 6px -1px rgba(0,0,0,.08),0 2px 4px -2px rgba(0,0,0,.05);
+}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+  background:var(--bg);color:var(--txt);font-size:14px;line-height:1.5;
+  min-height:100vh;
+}
+
+/* ── layout ─────────────────────────────────────────── */
+.header{
+  border-bottom:1px solid var(--border);padding:0 24px;
+  display:flex;align-items:center;gap:12px;height:52px;
+  position:sticky;top:0;background:rgba(255,255,255,.95);
+  backdrop-filter:blur(8px);z-index:10;
+}
+.brand{font-size:16px;font-weight:700;letter-spacing:-.4px;white-space:nowrap}
+.brand em{color:var(--primary);font-style:normal}
+.hdr-sep{width:1px;height:20px;background:var(--border);flex-shrink:0}
+.hdr-meta{display:flex;gap:16px;align-items:center;margin-left:auto;font-size:12px;color:var(--txt2)}
+.hdr-meta span{white-space:nowrap}
+
+.tabs{display:flex;border-bottom:1px solid var(--border);padding:0 24px;background:var(--bg)}
+.tab-btn{
+  background:none;border:none;border-bottom:2px solid transparent;
+  padding:10px 14px;font-size:13px;font-weight:500;color:var(--txt2);
+  cursor:pointer;margin-bottom:-1px;transition:color .12s,border-color .12s;
+}
+.tab-btn:hover{color:var(--txt)}
+.tab-btn.active{color:var(--primary);border-bottom-color:var(--primary)}
+
+.page{display:none;padding:24px;max-width:1400px;margin:0 auto}
+.page.active{display:block}
+
+/* ── cards ──────────────────────────────────────────── */
+.card{background:var(--bg);border:1px solid var(--border);border-radius:var(--r2);box-shadow:var(--shadow)}
+.card-hdr{
+  padding:10px 16px;border-bottom:1px solid var(--border);
+  font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--txt3);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.card-body{padding:16px}
+
+/* ── stat cards ─────────────────────────────────────── */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;margin-bottom:20px}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px}
+.stat-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--txt3);margin-bottom:5px}
+.stat-val{font-size:26px;font-weight:800;line-height:1.1;color:var(--txt)}
+.stat-val.green{color:var(--success)}
+.stat-val.blue{color:var(--primary)}
+.stat-sub{font-size:11px;color:var(--txt3);margin-top:3px}
+
+/* ── progress bar ───────────────────────────────────── */
+.prog-wrap{margin-bottom:20px}
+.prog-header{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
+.prog-title{font-size:13px;font-weight:600;color:var(--txt)}
+.prog-pct{font-size:12px;color:var(--txt3)}
+.prog-bar{height:7px;background:var(--surface2);border-radius:4px;overflow:hidden;border:1px solid var(--border)}
+.prog-fill{height:100%;background:var(--primary);border-radius:4px;transition:width .5s ease}
+
+/* ── charts ─────────────────────────────────────────── */
+.chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
+@media(max-width:860px){.chart-grid{grid-template-columns:1fr}}
+.chart-canvas-wrap{position:relative;height:220px}
+.chart-canvas-wrap.tall{height:280px}
+
+/* ── badges ─────────────────────────────────────────── */
+.badge{
+  display:inline-flex;align-items:center;gap:5px;
+  font-size:10px;font-weight:700;padding:3px 9px;border-radius:99px;
+  text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;
+}
+.badge.running{background:var(--primary-lt);color:var(--primary)}
+.badge.done{background:var(--success-lt);color:var(--success)}
+.badge.idle{background:var(--surface);color:var(--txt3);border:1px solid var(--border)}
+.dot{width:6px;height:6px;border-radius:50%;background:currentColor;flex-shrink:0}
+.pulse{animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+
+/* ── table ──────────────────────────────────────────── */
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead th{
+  padding:8px 12px;text-align:left;white-space:nowrap;
+  font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;
+  color:var(--txt3);border-bottom:2px solid var(--border);
+}
+thead th.sort{cursor:pointer;user-select:none;transition:color .1s}
+thead th.sort:hover{color:var(--txt2)}
+thead th.asc::after{content:" ↑";color:var(--primary)}
+thead th.desc::after{content:" ↓";color:var(--primary)}
+tbody tr{border-bottom:1px solid var(--border)}
+tbody tr:last-child{border-bottom:none}
+tbody tr:hover{background:var(--surface)}
+tbody td{padding:8px 12px;color:var(--txt2);vertical-align:middle}
+td.mono{font-family:var(--mono);font-size:12px}
+td.bold{color:var(--txt);font-weight:600}
+.jb{color:var(--success);font-weight:700}
+.no{color:var(--txt3)}
+.degen{color:var(--warn);font-style:italic;font-size:11px}
+.asr-hi{color:var(--success);font-weight:700}
+.asr-mid{color:var(--primary)}
+.asr-lo{color:var(--warn)}
+
+/* ── empty state ────────────────────────────────────── */
+.empty{text-align:center;padding:56px 24px;color:var(--txt3)}
+.empty h3{font-size:15px;font-weight:600;color:var(--txt2);margin-bottom:6px}
+.empty p{font-size:13px;line-height:1.6}
+.empty code{
+  display:inline-block;background:var(--surface);border:1px solid var(--border);
+  border-radius:4px;padding:2px 7px;font-family:var(--mono);font-size:12px;
+  color:var(--txt2);margin-top:6px;
+}
+.notice{
+  background:var(--primary-lt);border:1px solid #bfdbfe;color:#1e40af;
+  border-radius:var(--r);padding:10px 14px;font-size:13px;margin-bottom:20px;
+}
+
+/* ── misc ───────────────────────────────────────────── */
+.row-sep{margin-bottom:20px}
+.refresh-btn{
+  background:none;border:1px solid var(--border);border-radius:4px;
+  padding:3px 10px;font-size:11px;color:var(--txt2);cursor:pointer;
+  transition:background .1s,color .1s;
+}
+.refresh-btn:hover{background:var(--surface2);color:var(--txt)}
+.run-id{font-family:var(--mono);font-size:11px;color:var(--txt3)}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════ HEADER ═══════════════════════ -->
+<header class="header">
+  <div class="brand">DJA <em>Dashboard</em></div>
+  <div class="hdr-sep"></div>
+  <span id="hdr-badge" class="badge idle"><span class="dot"></span>Idle</span>
+  <div class="hdr-meta">
+    <span id="hdr-model" style="font-weight:600">—</span>
+    <span id="hdr-elapsed">—</span>
+    <span id="hdr-runid" class="run-id"></span>
+  </div>
+</header>
+
+<!-- ═══════════════════ TABS ═══════════════════════ -->
+<nav class="tabs">
+  <button class="tab-btn active" onclick="switchTab('live',this)">&#9654; Live Monitor</button>
+  <button class="tab-btn" onclick="switchTab('board',this)">&#9776; Leaderboard</button>
+</nav>
+
+<!-- ══════════════════════════════════════════════════
+     TAB — Live Monitor
+═════════════════════════════════════════════════════ -->
+<div id="page-live" class="page active">
+
+  <div id="live-http-warn" class="notice" style="display:none">
+    This dashboard requires an HTTP server.
+    Run <code>dja serve</code> or <code>python -m http.server 8080</code>
+    in the <code>dja-results/</code> directory, then open
+    <code>http://localhost:8080</code>.
+  </div>
+
+  <div id="live-empty" class="empty" style="display:none">
+    <h3>No active evaluation</h3>
+    <p>Start one with</p>
+    <code>dja eval --model &lt;model&gt; --results-dir /path/to/dja-results ...</code>
+    <p style="margin-top:10px;color:var(--txt3);font-size:12px">
+      This page refreshes automatically every 2.5 seconds.
+    </p>
+  </div>
+
+  <div id="live-content">
+    <!-- progress -->
+    <div class="prog-wrap">
+      <div class="prog-header">
+        <span class="prog-title" id="live-label">Waiting for evaluation…</span>
+        <span class="prog-pct" id="live-pct">0 / 0</span>
+      </div>
+      <div class="prog-bar"><div class="prog-fill" id="live-fill" style="width:0%"></div></div>
+    </div>
+
+    <!-- stats -->
+    <div class="stat-grid">
+      <div class="stat">
+        <div class="stat-lbl">ASR (composite)</div>
+        <div class="stat-val green" id="s-asr">—</div>
+        <div class="stat-sub" id="s-asr-harm">harm-only: —</div>
+      </div>
+      <div class="stat">
+        <div class="stat-lbl">Completed</div>
+        <div class="stat-val blue" id="s-done">—</div>
+        <div class="stat-sub" id="s-total">of — prompts</div>
+      </div>
+      <div class="stat">
+        <div class="stat-lbl">Mean Iters to JB</div>
+        <div class="stat-val" id="s-iters">—</div>
+        <div class="stat-sub">outer loop iterations</div>
+      </div>
+      <div class="stat">
+        <div class="stat-lbl">Elapsed</div>
+        <div class="stat-val" id="s-elapsed">—</div>
+        <div class="stat-sub" id="s-eta">est. remaining: —</div>
+      </div>
+    </div>
+
+    <!-- charts -->
+    <div class="chart-grid">
+      <div class="card">
+        <div class="card-hdr">Score Timeline</div>
+        <div class="card-body">
+          <div class="chart-canvas-wrap"><canvas id="c-timeline"></canvas></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-hdr">Score Distribution</div>
+        <div class="card-body">
+          <div class="chart-canvas-wrap"><canvas id="c-dist"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- recent results table -->
+    <div class="card">
+      <div class="card-hdr">
+        Recent Results
+        <span id="live-count" style="font-size:11px;font-weight:400;color:var(--txt3)"></span>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr>
+            <th>#</th><th>Prompt</th><th>Result</th>
+            <th>Harm</th><th>Composite</th><th>Iters</th><th>Suffix Len</th>
+          </tr></thead>
+          <tbody id="live-tbody">
+            <tr><td colspan="7" style="text-align:center;padding:28px;color:var(--txt3)">Waiting…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     TAB — Leaderboard
+═════════════════════════════════════════════════════ -->
+<div id="page-board" class="page">
+
+  <div id="board-empty" class="empty" style="display:none">
+    <h3>No completed runs yet</h3>
+    <p>Finish an evaluation with</p>
+    <code>dja eval --model &lt;model&gt; --results-dir /path/to/dja-results ...</code>
+    <p style="margin-top:10px;color:var(--txt3);font-size:12px">
+      Results appear here automatically after each run.
+    </p>
+  </div>
+
+  <div id="board-content">
+
+    <!-- summary -->
+    <div class="stat-grid row-sep">
+      <div class="stat">
+        <div class="stat-lbl">Models Evaluated</div>
+        <div class="stat-val blue" id="b-total">—</div>
+        <div class="stat-sub">completed runs</div>
+      </div>
+      <div class="stat">
+        <div class="stat-lbl">Best ASR</div>
+        <div class="stat-val green" id="b-best-asr">—</div>
+        <div class="stat-sub" id="b-best-asr-model">—</div>
+      </div>
+      <div class="stat">
+        <div class="stat-lbl">Avg ASR</div>
+        <div class="stat-val" id="b-avg-asr">—</div>
+        <div class="stat-sub">across all models</div>
+      </div>
+      <div class="stat">
+        <div class="stat-lbl">Fastest (mean iters)</div>
+        <div class="stat-val" id="b-fast">—</div>
+        <div class="stat-sub" id="b-fast-model">—</div>
+      </div>
+    </div>
+
+    <!-- charts -->
+    <div class="chart-grid row-sep">
+      <div class="card">
+        <div class="card-hdr">
+          ASR by Model
+          <button class="refresh-btn" onclick="loadLeaderboard()">&#8635; Refresh</button>
+        </div>
+        <div class="card-body">
+          <div class="chart-canvas-wrap tall"><canvas id="c-asr-bar"></canvas></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-hdr">Cumulative ASR Curve (by iteration budget)</div>
+        <div class="card-body">
+          <div class="chart-canvas-wrap tall"><canvas id="c-asr-curve"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- model table -->
+    <div class="card">
+      <div class="card-hdr">
+        All Results
+        <span id="board-updated" style="font-size:10px;font-weight:400;color:var(--txt3)"></span>
+      </div>
+      <div class="tbl-wrap">
+        <table id="board-tbl">
+          <thead><tr>
+            <th style="width:32px">#</th>
+            <th class="sort" data-col="model_short">Model</th>
+            <th class="sort" data-col="total_prompts">Prompts</th>
+            <th class="sort" data-col="asr">ASR ↓</th>
+            <th class="sort" data-col="asr_harm_only">ASR (harm)</th>
+            <th class="sort" data-col="mean_iters">Mean Iters</th>
+            <th class="sort" data-col="median_iters">Med. Iters</th>
+            <th class="sort" data-col="score_p50">Score p50</th>
+            <th class="sort" data-col="suffix_len_mean">Sfx Len</th>
+            <th class="sort" data-col="elapsed_seconds">Time</th>
+            <th class="sort" data-col="completed_at">Date</th>
+          </tr></thead>
+          <tbody id="board-tbody">
+            <tr><td colspan="11" style="text-align:center;padding:28px;color:var(--txt3)">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ── utils ────────────────────────────────────────────────────
+const $=id=>document.getElementById(id);
+const pct=v=>v==null?'—':(v*100).toFixed(1)+'%';
+const f1=v=>v==null?'—':Number(v).toFixed(1);
+const f2=v=>v==null?'—':Number(v).toFixed(2);
+const fh=s=>s==null?'—':(s/3600).toFixed(2)+'h';
+const fdate=s=>s?s.slice(0,10):'—';
+
+function elapsed(s){
+  if(s==null)return'—';
+  s=Math.round(s);
+  const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),ss=s%60;
+  if(h)return`${h}h ${m}m`;
+  if(m)return`${m}m ${ss}s`;
+  return`${ss}s`;
+}
+function trunc(s,n=80){s=String(s||'');return s.length>n?s.slice(0,n)+'…':s;}
+
+// ── tab switching ───────────────────────────────────────────
+function switchTab(name,btn){
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  btn.classList.add('active');
+  $('page-'+name).classList.add('active');
+  if(name==='board') loadLeaderboard();
+}
+
+// ── chart palette ───────────────────────────────────────────
+const PALETTE=['#2563eb','#16a34a','#9333ea','#d97706','#dc2626',
+               '#0891b2','#be185d','#65a30d','#7c3aed','#b45309',
+               '#0369a1','#166534','#581c87','#92400e','#991b1b'];
+
+const CHART_OPTS={responsive:true,maintainAspectRatio:false,animation:{duration:120},
+  plugins:{legend:{display:false}}};
+
+// ══════════════════════════════════════════════════════════
+// LIVE MONITOR
+// ══════════════════════════════════════════════════════════
+let _live=null,_cTL=null,_cDist=null;
+
+function setHeader(data){
+  if(!data){
+    $('hdr-badge').className='badge idle';
+    $('hdr-badge').innerHTML='<span class="dot"></span>Idle';
+    $('hdr-model').textContent='—';$('hdr-elapsed').textContent='—';
+    $('hdr-runid').textContent=''; return;
+  }
+  const run=data.status==='running';
+  $('hdr-badge').className='badge '+(run?'running':'done');
+  $('hdr-badge').innerHTML=run?'<span class="dot pulse"></span>Running':'<span class="dot"></span>Done';
+  $('hdr-model').textContent=data.model_short||data.model||'—';
+  $('hdr-elapsed').textContent=elapsed(data.elapsed);
+  $('hdr-runid').textContent=data.run_id||'';
+}
+
+function renderLive(d){
+  _live=d; setHeader(d);
+  const n=d.completed||0, T=d.total||0, p=T?n/T:0;
+  $('live-fill').style.width=(p*100).toFixed(1)+'%';
+  $('live-pct').textContent=`${n} / ${T}`;
+  $('live-label').textContent=d.model_short||d.model||'Evaluating…';
+  $('s-asr').textContent=n?pct(d.asr):'—';
+  $('s-asr-harm').textContent='harm-only: '+(n?pct(d.asr_harm):'—');
+  $('s-done').textContent=String(n);
+  $('s-total').textContent=`of ${T} prompts`;
+  $('s-iters').textContent=d.mean_iters!=null?f1(d.mean_iters):'—';
+  $('s-elapsed').textContent=elapsed(d.elapsed);
+  if(n>0&&T>n&&d.elapsed){
+    $('s-eta').textContent='est. remaining: '+elapsed((d.elapsed/n)*(T-n));
+  } else {
+    $('s-eta').textContent=n>=T&&T>0?'completed':'—';
+  }
+
+  // timeline scatter
+  const scores=d.scores||[];
+  const pts=scores.map((s,i)=>({x:i+1,y:s}));
+  const ptClr=scores.map(s=>s>=0.5?'#16a34a':'#dc2626');
+  if(!_cTL){
+    _cTL=new Chart($('c-timeline').getContext('2d'),{
+      type:'scatter',
+      data:{datasets:[{data:pts,backgroundColor:ptClr,pointRadius:4,pointHoverRadius:6}]},
+      options:{..._co(),
+        scales:{
+          x:{title:{display:true,text:'Prompt #',font:{size:11}},grid:{color:'#f1f5f9'}},
+          y:{min:0,max:1,title:{display:true,text:'Score',font:{size:11}},grid:{color:'#f1f5f9'}},
+        },
+        plugins:{..._cop(),tooltip:{callbacks:{label:c=>`Score: ${c.parsed.y.toFixed(3)}`}}}
+      }
+    });
+  } else {
+    _cTL.data.datasets[0].data=pts;
+    _cTL.data.datasets[0].backgroundColor=ptClr;
+    _cTL.update('none');
+  }
+
+  // distribution histogram
+  const bins=[0,.1,.2,.3,.4,.5,.6,.7,.8,.9,1];
+  const cts=Array(10).fill(0);
+  scores.forEach(s=>{cts[Math.min(Math.floor(s*10),9)]++;});
+  const bLbl=bins.slice(0,-1).map((b,i)=>`${(b*100).toFixed(0)}–${(bins[i+1]*100).toFixed(0)}`);
+  const bClr=bins.slice(0,-1).map(b=>b>=0.5?'rgba(22,163,74,.8)':'rgba(220,38,38,.8)');
+  if(!_cDist){
+    _cDist=new Chart($('c-dist').getContext('2d'),{
+      type:'bar',
+      data:{labels:bLbl,datasets:[{data:cts,backgroundColor:bClr,borderRadius:3,borderWidth:0}]},
+      options:{..._co(),
+        scales:{
+          x:{grid:{display:false},ticks:{font:{size:10}}},
+          y:{beginAtZero:true,grid:{color:'#f1f5f9'},ticks:{precision:0}},
+        },
+        plugins:{..._cop(),tooltip:{callbacks:{label:c=>`${c.parsed.y} prompts`}}}
+      }
+    });
+  } else {
+    _cDist.data.datasets[0].data=cts;
+    _cDist.data.datasets[0].backgroundColor=bClr;
+    _cDist.update('none');
+  }
+
+  // recent table
+  const recent=d.recent||[];
+  $('live-count').textContent=`${n} total`;
+  const tbody=$('live-tbody');
+  if(!recent.length){
+    tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--txt3)">No results yet…</td></tr>';
+    return;
+  }
+  tbody.innerHTML=recent.map((r,i)=>{
+    const jb=r.jailbreak?'<span class="jb">✓ JB</span>':'<span class="no">✗ Safe</span>';
+    return`<tr>
+      <td class="mono">${n-i}</td>
+      <td title="${esc(r.prompt)}">${trunc(r.prompt)}</td>
+      <td>${jb}</td>
+      <td class="mono">${f2(r.harm)}</td>
+      <td class="mono">${f2(r.composite)}</td>
+      <td class="mono">${r.iters??'—'}</td>
+      <td class="mono">${r.suffix_len??'—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+function showLiveEmpty(){
+  $('live-empty').style.display='';
+  $('live-content').style.display='none';
+  setHeader(null);
+}
+function showLiveContent(){
+  $('live-empty').style.display='none';
+  $('live-content').style.display='';
+}
+
+async function pollLive(){
+  if(location.protocol==='file:'){
+    $('live-http-warn').style.display='';
+    $('live-content').style.display='none';
+    $('live-empty').style.display='none';
+    return;
+  }
+  try{
+    const r=await fetch('live/status.json?_t='+Date.now());
+    if(!r.ok) throw new Error();
+    const d=await r.json();
+    showLiveContent();
+    renderLive(d);
+  } catch {
+    if(!_live) showLiveEmpty();
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+// LEADERBOARD
+// ══════════════════════════════════════════════════════════
+let _runs=[],_sCol='asr',_sDir=-1,_cBar=null,_cCurve=null;
+
+function showBoardEmpty(){$('board-empty').style.display='';$('board-content').style.display='none'}
+function showBoardContent(){$('board-empty').style.display='none';$('board-content').style.display=''}
+
+async function loadLeaderboard(){
+  if(location.protocol==='file:'){showBoardEmpty();return;}
+  try{
+    const r=await fetch('index.json?_t='+Date.now());
+    if(!r.ok){showBoardEmpty();return;}
+    const idx=await r.json();
+    const runs=(idx.runs||[]).filter(Boolean);
+    if(!runs.length){showBoardEmpty();return;}
+    _runs=runs;
+    showBoardContent();
+    renderBoardStats(runs);
+    renderBoardCharts(runs);
+    renderBoardTable();
+    if(idx.updated_at)
+      $('board-updated').textContent='Updated '+idx.updated_at.slice(0,16).replace('T',' ');
+  } catch {showBoardEmpty();}
+}
+
+function renderBoardStats(runs){
+  $('b-total').textContent=String(runs.length);
+  const byAsr=[...runs].sort((a,b)=>(b.asr||0)-(a.asr||0));
+  const best=byAsr[0];
+  $('b-best-asr').textContent=best?pct(best.asr):'—';
+  $('b-best-asr-model').textContent=best?(best.model_short||best.model||'—'):'—';
+  $('b-avg-asr').textContent=pct(runs.reduce((s,r)=>s+(r.asr||0),0)/runs.length);
+  const withIters=runs.filter(r=>r.mean_iters!=null);
+  if(withIters.length){
+    const fast=withIters.reduce((a,b)=>a.mean_iters<b.mean_iters?a:b);
+    $('b-fast').textContent=f1(fast.mean_iters);
+    $('b-fast-model').textContent=fast.model_short||fast.model||'—';
+  }
+}
+
+function renderBoardCharts(runs){
+  const sorted=[...runs].sort((a,b)=>(b.asr||0)-(a.asr||0));
+  const labels=sorted.map(r=>r.model_short||r.model||r.id);
+  const asrPcts=sorted.map(r=>Number(((r.asr||0)*100).toFixed(2)));
+  const barClr=asrPcts.map(v=>v>=90?'#16a34a':v>=60?'#2563eb':'#d97706');
+
+  if(!_cBar){
+    _cBar=new Chart($('c-asr-bar').getContext('2d'),{
+      type:'bar',
+      data:{labels,datasets:[{data:asrPcts,backgroundColor:barClr,borderRadius:3,borderWidth:0}]},
+      options:{..._co(),
+        indexAxis:'y',
+        scales:{
+          x:{min:0,max:100,grid:{color:'#f1f5f9'},
+             title:{display:true,text:'ASR (%)',font:{size:11}}},
+          y:{grid:{display:false},ticks:{font:{size:11}}},
+        },
+        plugins:{..._cop(),tooltip:{callbacks:{label:c=>`ASR: ${c.parsed.x.toFixed(1)}%`}}}
+      }
+    });
+  } else {
+    _cBar.data.labels=labels;
+    _cBar.data.datasets[0].data=asrPcts;
+    _cBar.data.datasets[0].backgroundColor=barClr;
+    _cBar.update();
+  }
+
+  // ASR curve
+  const BUDGETS=[5,10,20,50,100,200,500,1000,2000];
+  const curveDS=sorted.map((run,i)=>{
+    const c=run.asr_curve||{};
+    return{
+      label:run.model_short||run.model||run.id,
+      data:BUDGETS.map(k=>{
+        const v=c[String(k)]??c[k];
+        return v!=null?Number((v*100).toFixed(2)):null;
+      }),
+      borderColor:PALETTE[i%PALETTE.length],
+      backgroundColor:'transparent',
+      borderWidth:2,pointRadius:3,tension:.3,spanGaps:true,
+    };
+  });
+
+  if(!_cCurve){
+    _cCurve=new Chart($('c-asr-curve').getContext('2d'),{
+      type:'line',
+      data:{labels:BUDGETS,datasets:curveDS},
+      options:{..._co(),
+        plugins:{
+          legend:{display:true,position:'bottom',
+            labels:{boxWidth:12,font:{size:11},padding:10,usePointStyle:true}},
+          tooltip:{mode:'index',intersect:false}
+        },
+        scales:{
+          x:{type:'category',
+             title:{display:true,text:'Iteration budget',font:{size:11}},
+             grid:{color:'#f1f5f9'}},
+          y:{min:0,max:100,
+             title:{display:true,text:'Cumulative ASR (%)',font:{size:11}},
+             grid:{color:'#f1f5f9'}},
+        }
+      }
+    });
+  } else {
+    _cCurve.data.datasets=curveDS;
+    _cCurve.update();
+  }
+}
+
+function renderBoardTable(){
+  const rows=[..._runs].sort((a,b)=>{
+    const va=a[_sCol],vb=b[_sCol];
+    if(va==null&&vb==null)return 0;
+    if(va==null)return 1; if(vb==null)return-1;
+    if(typeof va==='string')return _sDir*va.localeCompare(vb);
+    return _sDir*(va-vb);
+  });
+  // header arrows
+  document.querySelectorAll('#board-tbl thead th.sort').forEach(th=>{
+    th.classList.remove('asc','desc');
+    if(th.dataset.col===_sCol) th.classList.add(_sDir===-1?'desc':'asc');
+  });
+  $('board-tbody').innerHTML=rows.map((r,i)=>{
+    const asr=r.asr??null;
+    const asrCls=asr==null?'':asr>=.9?'asr-hi':asr>=.6?'asr-mid':'asr-lo';
+    return`<tr>
+      <td>${i+1}</td>
+      <td class="bold">${esc(r.model_short||r.model||r.id)}</td>
+      <td class="mono">${r.total_prompts??'—'}</td>
+      <td class="mono bold ${asrCls}">${pct(asr)}</td>
+      <td class="mono">${pct(r.asr_harm_only)}</td>
+      <td class="mono">${f1(r.mean_iters)}</td>
+      <td class="mono">${f1(r.median_iters)}</td>
+      <td class="mono">${f2(r.score_p50)}</td>
+      <td class="mono">${f1(r.suffix_len_mean)}</td>
+      <td class="mono">${fh(r.elapsed_seconds)}</td>
+      <td class="mono">${fdate(r.completed_at)}</td>
+    </tr>`;
+  }).join('');
+}
+
+document.querySelectorAll('#board-tbl thead th.sort').forEach(th=>{
+  th.addEventListener('click',()=>{
+    const col=th.dataset.col;
+    if(_sCol===col) _sDir*=-1; else{_sCol=col;_sDir=-1;}
+    renderBoardTable();
+  });
+});
+
+// ── chart option helpers ─────────────────────────────────
+function _co(){return{responsive:true,maintainAspectRatio:false,animation:{duration:120}}}
+function _cop(){return{legend:{display:false}}}
+
+// ── XSS escape ───────────────────────────────────────────
+function esc(s){
+  return String(s||'')
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+
+// ── init ─────────────────────────────────────────────────
+pollLive();
+setInterval(pollLive, 2500);
+</script>
+</body>
+</html>

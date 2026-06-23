@@ -129,11 +129,21 @@ def _build_parser() -> argparse.ArgumentParser:
 
     # output
     og = ev.add_argument_group("Output")
-    og.add_argument("--report",    default=None, metavar="PATH",
+    og.add_argument("--report",      default=None, metavar="PATH",
                     help="Write final JSON report to this path.")
-    og.add_argument("--verbose",   action="store_true",
+    og.add_argument("--results-dir", default=None, metavar="DIR",
+                    help=(
+                        "Write structured results to a dja-results/ directory and serve "
+                        "a live web dashboard.  Default: ./dja-results when --results-dir "
+                        "is not given.  Use 'dja serve [DIR]' to open the dashboard."
+                    ))
+    og.add_argument("--run-name",    default=None, metavar="NAME",
+                    help="Display name for this run in the dashboard (default: model short name).")
+    og.add_argument("--no-dashboard", action="store_true",
+                    help="Disable results-dir / dashboard even when --results-dir is set.")
+    og.add_argument("--verbose",     action="store_true",
                     help="Print per-iteration loss/score details.")
-    og.add_argument("--no-banner", action="store_true",
+    og.add_argument("--no-banner",   action="store_true",
                     help="Suppress the DJA banner and visual progress output.")
 
     # ── dja score ────────────────────────────────────────────────────────────
@@ -198,6 +208,29 @@ def _build_parser() -> argparse.ArgumentParser:
     rp.add_argument("--no-banner", action="store_true",
                     help="Plain text output only (no ANSI / banner).")
 
+    # ── dja serve ────────────────────────────────────────────────────────────
+    sv = sub.add_parser(
+        "serve",
+        help="Serve the DJA web dashboard via HTTP — no GPU needed.",
+        description=(
+            "Start a lightweight HTTP server in the results directory so the\n"
+            "web dashboard (index.html) can poll live/status.json and index.json."
+        ),
+        epilog=(
+            "examples:\n"
+            "  dja serve                        # serve ./dja-results on port 8080\n"
+            "  dja serve ./my-results           # custom results directory\n"
+            "  dja serve --port 9000            # custom port\n"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    sv.add_argument("directory", nargs="?", default="./dja-results", metavar="DIR",
+                    help="Results directory to serve (default: ./dja-results).")
+    sv.add_argument("--port", type=int, default=8080, metavar="N",
+                    help="HTTP port (default: 8080).")
+    sv.add_argument("--no-open", action="store_true",
+                    help="Do not attempt to open a browser automatically.")
+
     return p
 
 
@@ -259,12 +292,19 @@ def _cmd_eval(args: argparse.Namespace) -> None:
     else:
         prompts = args.prompts      # list of raw prompt strings
 
+    # resolve results_dir: explicit flag > default ./dja-results (unless --no-dashboard)
+    results_dir = None
+    if not getattr(args, "no_dashboard", False):
+        results_dir = getattr(args, "results_dir", None) or "./dja-results"
+
     evaluator = DJAEvaluator(config)
     report = evaluator.evaluate(
         prompts=prompts,
         start_index=args.start,
         end_index=args.end,
         save_path=args.save,
+        results_dir=results_dir,
+        run_name=getattr(args, "run_name", None),
         verbose=args.verbose,
         show_progress=not args.no_banner,
     )
@@ -414,6 +454,55 @@ def _cmd_report(args: argparse.Namespace) -> None:
         print(f"  Report saved → {args.output}")
 
 
+def _cmd_serve(args: argparse.Namespace) -> None:
+    """dja serve — lightweight HTTP server for the web dashboard."""
+    import http.server
+    import os
+    import socketserver
+    import threading
+
+    directory = os.path.abspath(args.directory)
+    port = args.port
+
+    # Copy frontend if index.html is missing
+    if not os.path.exists(os.path.join(directory, "index.html")):
+        import shutil
+        from pathlib import Path
+        src = Path(__file__).parent / "_frontend" / "index.html"
+        if src.exists():
+            os.makedirs(directory, exist_ok=True)
+            shutil.copy2(src, os.path.join(directory, "index.html"))
+
+    url = f"http://localhost:{port}"
+    print(f"  DJA Dashboard  →  {url}")
+    print(f"  Directory      :  {directory}")
+    print("  Press Ctrl-C to stop.\n")
+
+    if not args.no_open:
+        def _open():
+            import time
+            time.sleep(0.5)
+            try:
+                import webbrowser
+                webbrowser.open(url)
+            except Exception:
+                pass
+        threading.Thread(target=_open, daemon=True).start()
+
+    os.chdir(directory)
+
+    class _Handler(http.server.SimpleHTTPRequestHandler):
+        def log_message(self, *a):  # silence per-request logs
+            pass
+
+    with socketserver.TCPServer(("", port), _Handler) as httpd:
+        httpd.allow_reuse_address = True
+        try:
+            httpd.serve_forever()
+        except KeyboardInterrupt:
+            print("\n  Stopped.")
+
+
 def main() -> None:
     parser = _build_parser()
     args = parser.parse_args()
@@ -423,6 +512,8 @@ def main() -> None:
         _cmd_score(args)
     elif args.command == "report":
         _cmd_report(args)
+    elif args.command == "serve":
+        _cmd_serve(args)
 
 
 if __name__ == "__main__":
