@@ -82,15 +82,17 @@ class DJAEvaluator:
 
         import warnings
         import logging
-        # Suppress noisy but harmless transformers runtime warnings.
+        import transformers as _tf
+        # Suppress noisy but harmless runtime warnings via both channels:
+        # (1) Python warnings module
         for _pat in (
             "The attention mask is not set",
             "Sliding Window Attention is enabled but not implemented",
             "Setting `pad_token_id` to `eos_token_id`",
         ):
             warnings.filterwarnings("ignore", message=_pat)
-        # transformers uses its own logger (not Python warnings), silence it too.
-        logging.getLogger("transformers").setLevel(logging.ERROR)
+        # (2) transformers' own logging (routes through its internal verbosity)
+        _tf.logging.set_verbosity_error()
 
         import torch
         from ._core.attacker_v3 import (

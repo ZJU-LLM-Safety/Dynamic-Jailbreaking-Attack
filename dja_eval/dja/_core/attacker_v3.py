@@ -1141,7 +1141,6 @@ class DynamicTemperatureAttacker:
             model_candidates = build_api_judge_model_candidates(model_name, api_judge_provider)
             print(
                 f"[Judge API] Initialized: provider={api_judge_provider} "
-                f"base_url={base_url or 'https://api.openai.com/v1'} "
                 f"primary_model={model_name} "
                 f"fallback_models={model_candidates[1:]}"
             )
@@ -1532,7 +1531,6 @@ class DynamicTemperatureAttacker:
         )
         print(
             f"[Quality Judge] Initialized: provider={resolved_provider} "
-            f"base_url={base_url or 'https://api.openai.com/v1'} "
             f"model={resolved_name} "
             f"fallback_models={self._quality_judge_model_candidates[1:]}"
         )
