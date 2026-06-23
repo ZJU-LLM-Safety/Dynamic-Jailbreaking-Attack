@@ -1280,7 +1280,71 @@ class DynamicTemperatureAttacker:
                 response=response,
             )
         raise ValueError("Unsupported judge llm: {}.".format(self.judge_name))
-    
+
+    def _score_harm_parallel(
+        self,
+        responses: list,
+        prompt: str,
+        max_workers: int = 16,
+        max_retries: int = 2,
+    ) -> list:
+        """Score N responses for harmfulness concurrently.
+
+        Uses ThreadPoolExecutor so all API requests are in-flight simultaneously.
+        Any result where unsafe_score < 0 (parse failure) is retried up to
+        max_retries times; on exhaustion the score defaults to 0.0.
+        """
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        def _one(idx: int, resp: str):
+            for _ in range(max_retries + 1):
+                try:
+                    s = self.score_response_by_judge_llm(response=resp, prompt=prompt)
+                    if s[1] >= 0:
+                        return idx, s[1]
+                except Exception:
+                    pass
+            return idx, 0.0
+
+        scores = [0.0] * len(responses)
+        with ThreadPoolExecutor(max_workers=min(len(responses), max_workers)) as ex:
+            futs = {ex.submit(_one, i, r): i for i, r in enumerate(responses)}
+            for fut in as_completed(futs):
+                idx, sc = fut.result()
+                scores[idx] = sc
+        return scores
+
+    def _score_quality_parallel(
+        self,
+        responses: list,
+        prompt: str,
+        max_workers: int = 16,
+        max_retries: int = 2,
+    ) -> list:
+        """Quality-score N responses concurrently.
+
+        Returns a list of dicts (or None on failure after max_retries retries).
+        """
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        def _one(idx: int, resp: str):
+            for _ in range(max_retries + 1):
+                try:
+                    q = self.score_response_quality(response=resp, prompt=prompt)
+                    if q is not None:
+                        return idx, q
+                except Exception:
+                    pass
+            return idx, None
+
+        results = [None] * len(responses)
+        with ThreadPoolExecutor(max_workers=min(len(responses), max_workers)) as ex:
+            futs = {ex.submit(_one, i, r): i for i, r in enumerate(responses)}
+            for fut in as_completed(futs):
+                idx, q = fut.result()
+                results[idx] = q
+        return results
+
     def soft_model_forward_decoding(
         self, 
         model, 
@@ -1954,12 +2018,11 @@ class DynamicTemperatureAttacker:
                         num_return_sequences=current_n - len(all_responses),
                         do_sample=True,
                     )
-                    for resp in batch_responses:
-                        s = self.score_response_by_judge_llm(response=resp, prompt=prompt)
-                        all_responses.append(resp)
-                        all_score_list.append(s[1])
-                        if s[1] >= adaptive_sample_threshold:
-                            found_unsafe = True
+                    batch_scores = self._score_harm_parallel(batch_responses, prompt)
+                    all_responses.extend(batch_responses)
+                    all_score_list.extend(batch_scores)
+                    if any(s >= adaptive_sample_threshold for s in batch_scores):
+                        found_unsafe = True
 
                     if found_unsafe:
                         break
@@ -1991,37 +2054,23 @@ class DynamicTemperatureAttacker:
                     do_sample = True
                 )
 
-                best_ref_response = None
-                best_ref_response_score = 0.0
-                best_ref_response_index = -1
                 best_ref_response_final_score = None
                 best_ref_response_quality_scores = None
-                score_list = []
-                for ref_idx, ref_response in enumerate(responses):
-                    scores = self.score_response_by_judge_llm(
-                        response=ref_response,
-                        prompt=prompt,
-                    )
-                    score_list.append(scores[1])
-
-                    if best_ref_response is None:
-                        best_ref_response = ref_response
-                        best_ref_response_score = scores[1]
-                        best_ref_response_index = ref_idx
-                    elif scores[1] > best_ref_response_score:
-                        best_ref_response = ref_response
-                        best_ref_response_score = scores[1]
-                        best_ref_response_index = ref_idx
+                score_list = self._score_harm_parallel(responses, prompt)
+                best_ref_response_index = int(
+                    max(range(len(score_list)), key=lambda k: score_list[k])
+                )
+                best_ref_response = responses[best_ref_response_index]
+                best_ref_response_score = score_list[best_ref_response_index]
 
             # ---- Optional: re-rank by composite score (harm + quality) ----
             if use_quality_scoring and hasattr(self, "_quality_judge_client") and self._quality_judge_client is not None:
-                composite_scores = []
-                quality_score_list = []
-                for resp_idx, (resp, hscore) in enumerate(zip(responses, score_list)):
-                    qscores = self.score_response_quality(response=resp, prompt=prompt)
-                    cscore = self.compute_composite_score(hscore, qscores)
-                    quality_score_list.append(qscores)
-                    composite_scores.append(cscore)
+                quality_score_list = self._score_quality_parallel(responses, prompt)
+                composite_scores = [
+                    self.compute_composite_score(hscore, qscores)
+                    if qscores is not None else hscore
+                    for hscore, qscores in zip(score_list, quality_score_list)
+                ]
 
                 # Re-select best by composite score
                 best_composite_idx = int(max(range(len(composite_scores)), key=lambda k: composite_scores[k]))
