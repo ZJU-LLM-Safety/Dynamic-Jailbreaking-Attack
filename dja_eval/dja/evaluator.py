@@ -232,6 +232,15 @@ class DJAEvaluator:
                 print(f"  {_cli.dim('▶')} Dashboard → {results_dir}/index.html")
                 print()
 
+        # ── Live per-prompt callback ─────────────────────────────────────────
+        _live_count: list = [0]  # mutable int in a list so closure can write it
+
+        def _on_raw_result(raw: dict) -> None:
+            ar = self._to_attack_result(raw)
+            _live_count[0] += 1
+            if show_progress:
+                _cli.print_live_result(ar, i=_live_count[0], n=n)
+
         # ── Run attack ───────────────────────────────────────────────────────
         t_attack = _time.time()
         try:
@@ -241,6 +250,7 @@ class DJAEvaluator:
                 end_index=end_index,
                 save_path=_raw_path,
                 verbose=verbose,
+                result_callback=_on_raw_result,
                 **self._build_attack_kwargs(),
             )
         finally:
@@ -254,13 +264,15 @@ class DJAEvaluator:
         # ── Persist to results store ─────────────────────────────────────────
         if _store is not None:
             _store.finalize(results, report)
-            # also honour save_path if both were given
             if save_path is not None and save_path != _raw_path:
                 report.to_jsonl(save_path)
 
         # ── Visual output ────────────────────────────────────────────────────
         if show_progress:
-            _cli.print_results(results, t_attack, t_done)
+            # per-prompt rows were already printed live via _on_raw_result;
+            # print_results skips those and only shows the header + any missed rows
+            _cli.print_results(results, t_attack, t_done,
+                               already_printed=_live_count[0])
             _cli.print_report(report, t_attack, t_done)
 
         return report

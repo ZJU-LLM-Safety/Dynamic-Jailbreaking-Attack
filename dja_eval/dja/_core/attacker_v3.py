@@ -1922,7 +1922,7 @@ class DynamicTemperatureAttacker:
             _pw_ids = torch.argmax(F.softmax(_pw_soft, dim=-1), dim=-1).detach()
             _pw_str = self.local_llm_tokenizer.batch_decode(_pw_ids, skip_special_tokens=True)[0]
 
-        for i in tqdm(range(num_iters), total = num_iters, desc = "Outer Loop"):
+        for i in tqdm(range(num_iters), total=num_iters, desc="Outer Loop", leave=False):
             # ---- Dynamic suffix expansion ----
             _expand_this_iter = False
             if (
@@ -2099,7 +2099,7 @@ class DynamicTemperatureAttacker:
             )
             init_suffix_logits_ = init_suffix_logits.detach()
             _inner_loss_history: list = []
-            for j in tqdm(range(num_inner_iters), total = num_inner_iters, desc = "Inner Loop"):
+            for j in tqdm(range(num_inner_iters), total=num_inner_iters, desc="Inner Loop", leave=False):
                 optimizer.zero_grad()
 
                 suffix_logits = init_suffix_logits_ + suffix_noise
@@ -2471,6 +2471,7 @@ class DynamicTemperatureAttacker:
         min_inner_iters: int = 10,
         inner_plateau_window: int = 3,
         inner_plateau_eps: float = 0.005,
+        result_callback=None,
     ) -> List[str]:
         assert target_set is not None or target_fn is not None, "Either target_set or target_fn must be provided."
         if target_set is None and target_fn is not None:
@@ -2537,6 +2538,11 @@ class DynamicTemperatureAttacker:
                 if fout:
                     fout.write(json.dumps(results[-1], ensure_ascii=False) + "\n")
                     fout.flush()
+                if result_callback is not None:
+                    try:
+                        result_callback(results[-1])
+                    except Exception:
+                        pass
         finally:
             if fout is not None:
                 fout.close()

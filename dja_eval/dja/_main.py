@@ -495,8 +495,10 @@ def _cmd_serve(args: argparse.Namespace) -> None:
         def log_message(self, *a):  # silence per-request logs
             pass
 
-    with socketserver.TCPServer(("", port), _Handler) as httpd:
-        httpd.allow_reuse_address = True
+    class _Server(socketserver.TCPServer):
+        allow_reuse_address = True   # must be set before bind()
+
+    with _Server(("", port), _Handler) as httpd:
         try:
             httpd.serve_forever()
         except KeyboardInterrupt:

@@ -113,8 +113,44 @@ def print_attack_start(n: int) -> None:
 
 # ── Per-result display ────────────────────────────────────────────────────────
 
-def print_results(results, t_attack: float, t_done: float) -> None:
-    """Print each AttackResult after all prompts complete."""
+def format_single_result(r, i: int, n: int) -> str:
+    """Return a formatted string for one AttackResult (used for live printing)."""
+    status = green("✓ JAILBREAK") if r.is_jailbreak else red("✗  failed  ")
+    scores = dim(
+        f"harm={r.harm_score:.3f}  "
+        f"composite={r.composite_score:.3f}  "
+        f"@iter={r.iterations_used}  "
+        f"suffix_len={r.suffix_length}"
+    )
+    prompt_s = r.prompt
+    if len(prompt_s) > 68:
+        prompt_s = prompt_s[:65] + "…"
+    suffix_s = r.adversarial_suffix or "(none)"
+    if len(suffix_s) > 68:
+        suffix_s = suffix_s[:65] + "…"
+    resp = (r.response or "").replace("\n", " ").strip()
+    if len(resp) > 160:
+        resp = resp[:157] + "…"
+    lines = [
+        f"  {bold(f'[{i}/{n}]')}  {status}  {scores}",
+        f"  {'':12}{dim('Prompt  :')} {yellow(prompt_s)}",
+        f"  {'':12}{dim('Suffix  :')} {cyan(suffix_s)}",
+        f"  {'':12}{dim('Response:')} {resp}",
+        "",
+    ]
+    return "\n".join(lines)
+
+
+def print_results(results, t_attack: float, t_done: float,
+                  already_printed: int = 0) -> None:
+    """Print AttackResult rows.
+
+    Parameters
+    ----------
+    already_printed:
+        Number of leading results already printed live (via print_live_result).
+        Only rows beyond this index are re-printed here.
+    """
     elapsed = t_done - t_attack
     n = len(results)
 
@@ -126,30 +162,18 @@ def print_results(results, t_attack: float, t_done: float) -> None:
     print()
 
     for i, r in enumerate(results, 1):
-        status = green("✓ JAILBREAK") if r.is_jailbreak else red("✗  failed  ")
-        scores = dim(
-            f"harm={r.harm_score:.3f}  "
-            f"composite={r.composite_score:.3f}  "
-            f"@iter={r.iterations_used}  "
-            f"suffix_len={r.suffix_length}"
-        )
-        print(f"  {bold(f'[{i}/{n}]')}  {status}  {scores}")
+        if i <= already_printed:
+            continue  # already shown live
+        print(format_single_result(r, i, n))
 
-        prompt_s = r.prompt
-        if len(prompt_s) > 68:
-            prompt_s = prompt_s[:65] + "…"
-        print(f"  {'':12}{dim('Prompt  :')} {yellow(prompt_s)}")
 
-        suffix_s = r.adversarial_suffix or "(none)"
-        if len(suffix_s) > 68:
-            suffix_s = suffix_s[:65] + "…"
-        print(f"  {'':12}{dim('Suffix  :')} {cyan(suffix_s)}")
-
-        resp = (r.response or "").replace("\n", " ").strip()
-        if len(resp) > 160:
-            resp = resp[:157] + "…"
-        print(f"  {'':12}{dim('Response:')} {resp}")
-        print()
+def print_live_result(r, i: int, n: int) -> None:
+    """Print one result live using tqdm.write() so it appears above progress bars."""
+    try:
+        from tqdm import tqdm as _tqdm
+        _tqdm.write(format_single_result(r, i, n))
+    except Exception:
+        print(format_single_result(r, i, n))
 
 
 # ── Final report ──────────────────────────────────────────────────────────────
