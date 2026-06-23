@@ -80,6 +80,15 @@ class DJAEvaluator:
         if self._attacker is not None:
             return
 
+        import warnings
+        # Suppress noisy but harmless transformers runtime warnings.
+        for _pat in (
+            "The attention mask is not set",
+            "Sliding Window Attention is enabled but not implemented",
+            "Setting `pad_token_id` to `eos_token_id`",
+        ):
+            warnings.filterwarnings("ignore", message=_pat)
+
         import torch
         from ._core.attacker_v3 import (
             DynamicTemperatureAttacker,
