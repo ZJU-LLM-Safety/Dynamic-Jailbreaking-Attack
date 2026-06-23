@@ -2535,6 +2535,7 @@ class DynamicTemperatureAttacker:
 
                 if fout:
                     fout.write(json.dumps(results[-1], ensure_ascii=False) + "\n")
+                    fout.flush()
         finally:
             if fout is not None:
                 fout.close()
