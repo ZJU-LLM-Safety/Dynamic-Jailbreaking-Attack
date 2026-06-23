@@ -94,6 +94,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--mask-rejection-words", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--early-stop-threshold", type=float, default=0.6,
                         help="Stop outer loop early when best composite score >= this value.")
+    parser.add_argument("--min-inner-iters", type=int, default=10,
+                        help="Minimum inner-loop steps before plateau-based early exit is allowed.")
     parser.add_argument("--start-index", type=int, default=0)
     parser.add_argument("--end-index", type=int, default=100)
     parser.add_argument(
@@ -185,6 +187,7 @@ def main() -> None:
         "adaptive_sample_threshold": args.adaptive_sample_threshold,
         "use_quality_scoring": args.use_quality_scoring,
         "early_stop_threshold": args.early_stop_threshold,
+        "min_inner_iters": args.min_inner_iters,
     }
 
     print("===============================================================")

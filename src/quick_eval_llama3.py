@@ -45,6 +45,7 @@ QUICK_DEFAULTS = dict(
     adaptive_sample_threshold=0.5,
     use_quality_scoring=True,
     early_stop_threshold=0.6,
+    min_inner_iters=10,
     verbose=False,
 )
 
@@ -71,6 +72,9 @@ def build_parser() -> argparse.ArgumentParser:
                    help="Outer iters without improvement before expanding suffix (0 = disabled)")
     p.add_argument("--early-stop-threshold", type=float,
                    default=QUICK_DEFAULTS["early_stop_threshold"])
+    p.add_argument("--min-inner-iters", type=int,
+                   default=QUICK_DEFAULTS["min_inner_iters"],
+                   help="Minimum inner-loop steps before plateau-based early exit is allowed.")
     p.add_argument("--judge-model", type=str, default=DEFAULT_OPENAI_JUDGE_MODEL)
     p.add_argument("--quality-judge-model", type=str, default=DEFAULT_OPENAI_JUDGE_MODEL)
     p.add_argument("--no-quality-scoring", action="store_true",
@@ -197,6 +201,7 @@ def main() -> None:
         adaptive_sample_threshold=QUICK_DEFAULTS["adaptive_sample_threshold"],
         use_quality_scoring=use_quality,
         early_stop_threshold=args.early_stop_threshold,
+        min_inner_iters=args.min_inner_iters,
         verbose=QUICK_DEFAULTS["verbose"],
     )
 
@@ -225,6 +230,7 @@ def main() -> None:
         "suffix_expand_patience": args.suffix_expand_patience,
         "use_quality_scoring": use_quality,
         "early_stop_threshold": args.early_stop_threshold,
+        "min_inner_iters": args.min_inner_iters,
         "asr_composite": sum(1 for r in raw_results if (r.get("best_final_score") or 0.0) >= threshold) / n if n else 0.0,
         "asr_harm_only": sum(1 for r in raw_results if (r.get("best_unsafe_score") or 0.0) >= threshold) / n if n else 0.0,
         "avg_composite_score": sum(r.get("best_final_score") or 0.0 for r in raw_results) / n if n else 0.0,

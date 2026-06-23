@@ -1777,6 +1777,9 @@ class DynamicTemperatureAttacker:
         adaptive_sample_threshold: float = 0.5,
         use_quality_scoring: bool = True,
         early_stop_threshold: float = 0.6,
+        min_inner_iters: int = 10,
+        inner_plateau_window: int = 3,
+        inner_plateau_eps: float = 0.005,
     ):
         prompt_ids = self.local_llm_tokenizer(prompt, return_tensors="pt").input_ids.to(
             self.local_llm_device
@@ -2048,6 +2051,7 @@ class DynamicTemperatureAttacker:
                 optimizer, step_size=50, gamma=0.9
             )
             init_suffix_logits_ = init_suffix_logits.detach()
+            _inner_loss_history: list = []
             for j in tqdm(range(num_inner_iters), total = num_inner_iters, desc = "Inner Loop"):
                 optimizer.zero_grad()
 
@@ -2169,6 +2173,15 @@ class DynamicTemperatureAttacker:
                 loss.backward()
                 optimizer.step()
                 scheduler.step()
+
+                # ---- Dynamic inner-loop early termination (loss plateau) ----
+                _inner_loss_history.append(loss.item())
+                if j >= min_inner_iters - 1 and len(_inner_loss_history) > inner_plateau_window:
+                    _window_start = _inner_loss_history[-(inner_plateau_window + 1)]
+                    _relative_change = abs(_window_start - loss.item()) / (abs(_window_start) + 1e-8)
+                    if _relative_change < inner_plateau_eps:
+                        break
+
                 if verbose and (j + 1) % 50 == 0 or j == num_inner_iters - 1:
                     print(
                         "Loss: ",
@@ -2408,6 +2421,9 @@ class DynamicTemperatureAttacker:
         adaptive_sample_threshold: float = 0.5,
         use_quality_scoring: bool = True,
         early_stop_threshold: float = 0.6,
+        min_inner_iters: int = 10,
+        inner_plateau_window: int = 3,
+        inner_plateau_eps: float = 0.005,
     ) -> List[str]:
         assert target_set is not None or target_fn is not None, "Either target_set or target_fn must be provided."
         if target_set is None and target_fn is not None:
@@ -2450,6 +2466,9 @@ class DynamicTemperatureAttacker:
                     adaptive_sample_threshold=adaptive_sample_threshold,
                     use_quality_scoring=use_quality_scoring,
                     early_stop_threshold=early_stop_threshold,
+                    min_inner_iters=min_inner_iters,
+                    inner_plateau_window=inner_plateau_window,
+                    inner_plateau_eps=inner_plateau_eps,
                 )
                 results.append(
                     {
