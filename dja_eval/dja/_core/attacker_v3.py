@@ -730,7 +730,6 @@ def run_openai_policy_gpt4_judge(
     content = responses_out.choices[0].message.content
     raw_score = gpt4_extract_content("#thescore:", content)
     if raw_score is None or raw_score < 0:
-        print("Warning: failed to parse GPT-4 judge score from output:", content)
         return -1.0
     return normalize_openai_judge_score(raw_score)
 
@@ -1979,9 +1978,7 @@ class DynamicTemperatureAttacker:
                 best_ref_response_score = score_list[best_ref_response_index]
                 best_ref_response_final_score = best_ref_response_score
                 best_ref_response_quality_scores = None
-                print(f"  [Adaptive] Final: {len(responses)} samples, "
-                      f"best_score={best_ref_response_score:.4f}, "
-                      f"unsafe_found={found_unsafe}")
+                pass
             else:
                 # ---- Standard fixed-count sampling ----
                 responses = self.reference_llm.generate(
