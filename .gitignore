@@ -88,9 +88,6 @@ src/eval/run_harmfulness_eval.py
 # Old refactoring attempt
 refactored_project/
 
-# Standalone evaluation package (local only, not yet released)
-dja_eval/
-
 # Personal assets
 heatmap-last-year.png
 

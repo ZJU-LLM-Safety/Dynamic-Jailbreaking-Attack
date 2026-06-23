@@ -1,0 +1,21 @@
+[project]
+name = "dja-redteam"
+version = "0.1.0"
+description = "Dynamic Jailbreaking Attack — white-box red-teaming evaluation package"
+requires-python = ">=3.12"
+dependencies = [
+    "torch>=2.7.0",
+    "transformers==4.49.0",
+    "openai>=2.29.0",
+    "python-dotenv>=1.2.2",
+    "tqdm>=4.67.3",
+    "pandas>=2.3.3",
+    "peft>=0.18.1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["dja"]

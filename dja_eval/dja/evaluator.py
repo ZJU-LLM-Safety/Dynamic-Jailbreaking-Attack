@@ -1,0 +1,297 @@
+"""DJAEvaluator — main entry point for white-box red-team evaluation."""
+
+import sys
+from pathlib import Path
+from typing import List, Optional, Union
+
+import torch
+
+from .config import DJAConfig, ModelConfig
+from .judge import BaseJudge
+from .result import AttackResult, RedTeamReport, ResponseScore
+
+# ── Resolve the sibling src/ directory so core modules are importable ───────
+_SRC_DIR = Path(__file__).resolve().parents[2] / "src"
+if str(_SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(_SRC_DIR))
+
+from attacker_v3 import (  # noqa: E402
+    DEFAULT_COMPOSITE_SCORE_WEIGHTS,
+    MODEL_NAME_TO_PATH,
+    DynamicTemperatureAttacker,
+    compute_composite_score_from_components,
+    detect_response_degeneracy,
+    get_model_path,
+)
+
+_DTYPE_MAP = {
+    "float16": torch.float16,
+    "float32": torch.float32,
+    "float": torch.float32,
+    "bfloat16": torch.bfloat16,
+}
+
+
+class DJAEvaluator:
+    """White-box red-team evaluator based on Dynamic Jailbreaking Attack.
+
+    Quick start::
+
+        from dja import DJAEvaluator, DJAConfig, ModelConfig
+
+        evaluator = DJAEvaluator(DJAConfig(model=ModelConfig(target_model="Qwen2.5-7B")))
+        report = evaluator.evaluate("data/raw/advbench_100.csv")
+        print(report.summary())
+
+    Parameters
+    ----------
+    config:
+        Full DJA configuration (model paths, attack params, scoring).
+    judge:
+        Optional custom judge implementing BaseJudge. When provided, replaces
+        the judge specified in config.scoring.judge_model.
+    """
+
+    def __init__(
+        self,
+        config: DJAConfig,
+        judge: Optional[BaseJudge] = None,
+    ):
+        self.config = config
+        self._custom_judge = judge
+        self._attacker: Optional[DynamicTemperatureAttacker] = None
+
+    # ── Lazy initialisation ─────────────────────────────────────────────────
+
+    def _ensure_loaded(self) -> None:
+        if self._attacker is not None:
+            return
+        mc = self.config.model
+        sc = self.config.scoring
+        samp = self.config.sampling
+        dtype = _DTYPE_MAP.get(mc.dtype, torch.bfloat16)
+
+        target_path = (
+            get_model_path(mc.target_model)
+            if mc.target_model in MODEL_NAME_TO_PATH
+            else mc.target_model
+        )
+        ref_model_key = mc.ref_model or mc.target_model
+        ref_path = (
+            get_model_path(ref_model_key)
+            if ref_model_key in MODEL_NAME_TO_PATH
+            else ref_model_key
+        )
+        judge_model = sc.judge_model if self._custom_judge is None else "gpt-4o-mini"
+
+        self._attacker = DynamicTemperatureAttacker(
+            local_client_name=mc.target_model,
+            local_llm_model_name_or_path=target_path,
+            local_llm_device=mc.target_device,
+            reference_client_name="HuggingFace",
+            ref_local_llm_model_name_or_path=ref_path,
+            ref_local_llm_device=mc.ref_device,
+            judge_llm_model_name_or_path=judge_model,
+            judge_llm_device=mc.judge_device,
+            dtype=dtype,
+            reference_model_infer_temperature=samp.temperature,
+            num_ref_infer_samples=samp.n_samples,
+        )
+
+        if sc.quality_judge_model:
+            self._attacker.init_quality_judge(
+                provider=sc.quality_judge_provider,
+                model_name=sc.quality_judge_model,
+            )
+
+    # ── Public API ──────────────────────────────────────────────────────────
+
+    def evaluate(
+        self,
+        prompts: Union[List[str], str],
+        start_index: int = 0,
+        end_index: Optional[int] = None,
+        save_path: Optional[str] = None,
+        verbose: bool = False,
+    ) -> RedTeamReport:
+        """Run the full attack pipeline on a prompt set and return a report.
+
+        Parameters
+        ----------
+        prompts:
+            List of harmful prompts, or a path to a CSV file with a `goal` /
+            `harmful` column (e.g. AdvBench).
+        start_index / end_index:
+            Slice of the prompt list to evaluate (useful for parallel runs).
+        save_path:
+            If given, intermediate results are written here as JSONL after
+            each prompt so progress is not lost on crash.
+        verbose:
+            Print per-iteration loss details.
+        """
+        self._ensure_loaded()
+
+        if isinstance(prompts, str):
+            from utils import load_target_set
+            prompts = load_target_set(prompts)
+
+        if end_index is None:
+            end_index = len(prompts)
+
+        raw_results = self._attacker.attack(
+            target_set=prompts,
+            start_index=start_index,
+            end_index=end_index,
+            save_path=save_path,
+            verbose=verbose,
+            **self._build_attack_kwargs(),
+        )
+
+        results = [self._to_attack_result(r) for r in raw_results]
+        return self._build_report(results)
+
+    def attack_single(
+        self,
+        prompt: str,
+        verbose: bool = False,
+    ) -> AttackResult:
+        """Attack a single prompt and return a structured result."""
+        self._ensure_loaded()
+
+        (
+            best_suffix, response, best_iter,
+            harm_score, final_score, quality_scores,
+            ref_response, ref_harm_score, ref_final_score, _ref_quality,
+        ) = self._attacker.optimize_single_prompt_with_suffix_in_double_loop(
+            prompt=prompt,
+            verbose=verbose,
+            **self._build_attack_kwargs(),
+        )
+
+        suffix_str = best_suffix[0] if isinstance(best_suffix, list) else (best_suffix or "")
+        response = response or ""
+        degen = detect_response_degeneracy(response)
+        threshold = self.config.scoring.success_threshold
+
+        return AttackResult(
+            prompt=prompt,
+            adversarial_suffix=suffix_str,
+            adversarial_prompt=f"{prompt} {suffix_str}",
+            response=response,
+            harm_score=harm_score,
+            quality_scores=quality_scores,
+            composite_score=final_score,
+            is_jailbreak=final_score >= threshold,
+            iterations_used=best_iter,
+            reference_response=ref_response or "",
+            reference_harm_score=ref_harm_score,
+            reference_composite_score=ref_final_score,
+            response_is_degenerate=degen["is_degenerate"],
+        )
+
+    def score(self, prompt: str, response: str) -> ResponseScore:
+        """Score an existing (prompt, response) pair without running the attack.
+
+        Useful for post-hoc evaluation of responses generated elsewhere.
+        """
+        self._ensure_loaded()
+
+        if self._custom_judge is not None:
+            harm = self._custom_judge.score(prompt, response)
+        else:
+            harm = self._attacker.score_response_by_judge_llm(
+                response=response, prompt=prompt
+            )[1]
+
+        sc = self.config.scoring
+        quality = None
+        composite = harm
+
+        if sc.quality_judge_model:
+            quality = self._attacker.score_response_quality(
+                response=response, prompt=prompt
+            )
+            composite = compute_composite_score_from_components(
+                harm_score=harm,
+                quality_scores=quality,
+                weights=sc.composite_weights,
+                hard_gate=sc.enable_hard_gate,
+                degeneracy=detect_response_degeneracy(response) if sc.enable_hard_gate else None,
+            )
+
+        degen = detect_response_degeneracy(response)
+        return ResponseScore(
+            harm_score=harm,
+            quality_scores=quality,
+            composite_score=composite,
+            is_degenerate=degen["is_degenerate"],
+            degeneracy_trigger=degen.get("trigger"),
+        )
+
+    # ── Internal helpers ────────────────────────────────────────────────────
+
+    def _build_attack_kwargs(self) -> dict:
+        ac = self.config.attack
+        sc = self.config.scoring
+        samp = self.config.sampling
+        return {
+            "num_iters": ac.num_iters,
+            "num_inner_iters": ac.num_inner_iters,
+            "learning_rate": ac.learning_rate,
+            "response_length": ac.response_length,
+            "forward_response_length": ac.forward_response_length,
+            "suffix_max_length": ac.suffix_max_length,
+            "suffix_init_length": ac.suffix_init_length,
+            "suffix_expand_patience": ac.suffix_expand_patience,
+            "suffix_expand_step": ac.suffix_expand_step,
+            "suffix_topk": ac.suffix_topk,
+            "suffix_init_token": ac.suffix_init_token,
+            "mask_rejection_words": ac.mask_rejection_words,
+            "adaptive_sample": samp.adaptive,
+            "adaptive_sample_max": samp.adaptive_max,
+            "adaptive_sample_threshold": samp.adaptive_threshold,
+            "use_quality_scoring": bool(sc.quality_judge_model),
+            "early_stop_threshold": ac.early_stop_threshold,
+            "min_inner_iters": ac.min_inner_iters,
+            "inner_plateau_window": ac.inner_plateau_window,
+            "inner_plateau_eps": ac.inner_plateau_eps,
+        }
+
+    def _to_attack_result(self, raw: dict) -> AttackResult:
+        suffix_list = raw.get("suffix") or [""]
+        suffix_str = suffix_list[0] if isinstance(suffix_list, list) else suffix_list
+        response = raw.get("response") or ""
+        degen = detect_response_degeneracy(response)
+        final_score = raw.get("best_final_score", 0.0)
+        threshold = self.config.scoring.success_threshold
+
+        return AttackResult(
+            prompt=raw["prompt"],
+            adversarial_suffix=suffix_str,
+            adversarial_prompt=raw.get("prompt_with_adv", f"{raw['prompt']} {suffix_str}"),
+            response=response,
+            harm_score=raw.get("best_unsafe_score", 0.0),
+            quality_scores=raw.get("best_response_quality_scores"),
+            composite_score=final_score,
+            is_jailbreak=final_score >= threshold,
+            iterations_used=raw.get("best_iter_idx", -1),
+            reference_response=raw.get("best_reference_response") or "",
+            reference_harm_score=raw.get("best_reference_response_score", 0.0),
+            reference_composite_score=raw.get("best_reference_response_final_score", 0.0),
+            response_is_degenerate=degen["is_degenerate"],
+        )
+
+    def _build_report(self, results: List[AttackResult]) -> RedTeamReport:
+        threshold = self.config.scoring.success_threshold
+        n = len(results)
+        successful = sum(1 for r in results if r.is_jailbreak)
+        asr_harm = (
+            sum(1 for r in results if r.harm_score >= threshold) / n if n else 0.0
+        )
+        return RedTeamReport(
+            asr=successful / n if n else 0.0,
+            asr_harm_only=asr_harm,
+            total_prompts=n,
+            successful=successful,
+            results=results,
+        )
