@@ -150,7 +150,7 @@ def _cmd_eval(args: argparse.Namespace) -> None:
         ),
         scoring=ScoringConfig(
             judge_model=args.judge,
-            judge_provider=args.judge_provider,
+            quality_judge_provider=args.judge_provider,
             quality_judge_model=quality_model,
             success_threshold=args.threshold,
             enable_hard_gate=not args.no_hard_gate,
