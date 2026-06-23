@@ -2,6 +2,7 @@
 name = "dja-redteam"
 version = "0.1.0"
 description = "Dynamic Jailbreaking Attack (DJA) — white-box LLM red-teaming"
+readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 keywords = ["llm", "red-team", "jailbreak", "adversarial", "safety", "alignment"]
