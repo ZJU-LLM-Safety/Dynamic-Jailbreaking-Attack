@@ -111,8 +111,11 @@ def _build_parser() -> argparse.ArgumentParser:
 
 def _cmd_eval(args: argparse.Namespace) -> None:
     # Lazy import so --help works without torch/transformers installed.
-    from dotenv import load_dotenv
-    load_dotenv()
+    try:
+        from dotenv import load_dotenv
+        load_dotenv()
+    except ImportError:
+        pass
 
     from .config import (
         AttackConfig, DJAConfig, ModelConfig, SamplingConfig, ScoringConfig
