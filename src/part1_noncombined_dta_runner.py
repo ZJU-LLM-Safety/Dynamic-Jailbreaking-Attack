@@ -85,8 +85,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--suffix-max-length", type=int, default=30)
     parser.add_argument("--suffix-init-length", type=int, default=5,
                         help="Starting suffix length for dynamic expansion.")
-    parser.add_argument("--suffix-expand-patience", type=int, default=0,
-                        help="Outer iters without improvement before expanding suffix. 0 = disabled.")
+    parser.add_argument("--suffix-expand-patience", type=int, default=50,
+                        help="Outer iters without improvement before expanding suffix (0 = disabled).")
     parser.add_argument("--suffix-expand-step", type=int, default=5,
                         help="Tokens added per expansion event.")
     parser.add_argument("--suffix-topk", type=int, default=10)

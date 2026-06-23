@@ -40,7 +40,7 @@ class AttackConfig:
     # Suffix design
     suffix_max_length: int = 30
     suffix_init_length: Optional[int] = 5      # start small, expand up to max
-    suffix_expand_patience: int = 0            # 0 → dynamic expansion disabled
+    suffix_expand_patience: int = 50           # expand after N outer iters w/o improvement
     suffix_expand_step: int = 5
     suffix_topk: int = 10
     suffix_init_token: str = "!"

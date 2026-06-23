@@ -168,7 +168,7 @@ python src/part1_noncombined_dta_runner.py \
 | `--adaptive-sample` | 开启 | 攻击遇阻时自动扩展采样预算 |
 | `--suffix-max-length` | 30 | 对抗后缀最大长度（token 数） |
 | `--suffix-init-length` | 5 | 动态扩展的初始后缀长度 |
-| `--suffix-expand-patience` | 0 | 无改善多少轮后扩展后缀（0 表示禁用） |
+| `--suffix-expand-patience` | 50 | 无改善多少轮后扩展后缀（0 表示禁用） |
 | `--use-quality-scoring` | 开启 | 启用综合有害性 + 质量评分 |
 | `--min-inner-iters` | 10 | 允许内循环提前退出前的最小梯度步数 |
 
