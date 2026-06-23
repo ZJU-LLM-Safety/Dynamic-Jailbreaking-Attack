@@ -227,7 +227,7 @@ def print_report(report, t_attack: float, t_done: float) -> None:
     if report.suffix_length_stats:
         s = report.suffix_length_stats
         print()
-        print(f"  {dim('Suffix length  (word-count proxy for tokens)')}")
+        print(f"  {dim('Suffix length  (BPE tokens)')}")
         print(
             f"    avg={s.get('mean', 0):.1f}  "
             f"std={s.get('std', 0):.1f}  "

@@ -127,6 +127,16 @@ class DJAEvaluator:
                 model_name=sc.quality_judge_model,
             )
 
+    def _suffix_token_len(self, suffix: str) -> int:
+        """Return the BPE token count of *suffix* using the loaded target tokenizer."""
+        try:
+            ids = self._attacker.local_llm_tokenizer(
+                suffix, add_special_tokens=False
+            ).input_ids
+            return len(ids)
+        except Exception:
+            return len(suffix.split())
+
     # ── Public API ──────────────────────────────────────────────────────────
 
     def evaluate(
@@ -243,7 +253,7 @@ class DJAEvaluator:
             reference_harm_score=ref_harm_score,
             reference_composite_score=ref_final_score,
             response_is_degenerate=degen["is_degenerate"],
-            suffix_length=len(suffix_str.split()),
+            suffix_length=self._suffix_token_len(suffix_str),
         )
 
     def score(self, prompt: str, response: str) -> ResponseScore:
@@ -333,7 +343,7 @@ class DJAEvaluator:
             reference_harm_score=raw.get("best_reference_response_score", 0.0),
             reference_composite_score=raw.get("best_reference_response_final_score", 0.0),
             response_is_degenerate=degen["is_degenerate"],
-            suffix_length=len(suffix_str.split()),
+            suffix_length=self._suffix_token_len(suffix_str),
         )
 
     def _build_report(self, results: List[AttackResult]) -> RedTeamReport:
