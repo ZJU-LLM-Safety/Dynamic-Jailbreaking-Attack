@@ -612,7 +612,7 @@
     <h2 class="section-title">Main Results</h2>
     <p class="section-sub">
       Evaluated on <strong>AdvBench-100</strong> using a GPT-4o-mini multi-objective scorer
-      (composite threshold ≥ 0.5). DJA achieves perfect ASR across all 24 evaluated open-weight models.
+      DJA achieves perfect ASR across all 24 evaluated open-weight models.
     </p>
 
     <div class="asr-banner">
@@ -756,7 +756,7 @@
 
     <p class="results-note">
       All results measured on <strong>AdvBench-100</strong>. A GPT-4o-mini multi-objective scorer evaluates each induced response across five dimensions —
-      harmfulness, feasibility, relevance, usefulness, and refusal-avoidance — and a composite score ≥ 0.5 is required for a successful attack.
+      harmfulness, feasibility, relevance, usefulness, and refusal-avoidance.
       DJA consistently achieves <strong>100% ASR on all 24 target models</strong>, substantially outperforming gradient-based baselines
       (GCG, COLD-Attack, AutoDAN, AdvPrefix) under their recommended settings.
       Notably, DJA jailbreaks <strong>Qwen3-32B with only 11.28 attack rounds on average</strong> per prompt.
