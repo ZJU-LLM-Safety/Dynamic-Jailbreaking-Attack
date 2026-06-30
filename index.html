@@ -542,64 +542,83 @@
       is both dangerous and semantically meaningful.
     </p>
 
-    <!-- Comparison table -->
-    <div class="cmp-table">
-      <div class="cmp-head">
-        <div class="cmp-head-cell"></div>
-        <div class="cmp-head-cell old">Previous Approaches</div>
-        <div class="cmp-head-cell new">DJA</div>
+    <div style="display:flex;gap:48px;align-items:flex-start;">
+
+      <!-- Left: description -->
+      <div style="flex:1;min-width:0;">
+
+        <!-- Comparison table -->
+        <div class="cmp-table">
+          <div class="cmp-head">
+            <div class="cmp-head-cell"></div>
+            <div class="cmp-head-cell old">Previous Approaches</div>
+            <div class="cmp-head-cell new">DJA</div>
+          </div>
+
+          <div class="cmp-body-row">
+            <div class="cmp-aspect">Target</div>
+            <div class="cmp-old"><span class="cmp-x">✗</span> Fixed "Sure, here is how to…" template</div>
+            <div class="cmp-new"><span class="cmp-check">✓</span> Sampled from model's current distribution</div>
+          </div>
+
+          <div class="cmp-body-row">
+            <div class="cmp-aspect">Judge</div>
+            <div class="cmp-old"><span class="cmp-x">✗</span> Harm score only — passes incoherent output</div>
+            <div class="cmp-new"><span class="cmp-check">✓</span> 5-dim composite: harm + 4 quality axes</div>
+          </div>
+
+          <div class="cmp-body-row">
+            <div class="cmp-aspect">Filter</div>
+            <div class="cmp-old"><span class="cmp-x">✗</span> No quality check — degenerate text counts</div>
+            <div class="cmp-new"><span class="cmp-check">✓</span> Degeneracy gate zeroes loops &amp; empty outputs</div>
+          </div>
+        </div>
+
+        <!-- Five dimensions -->
+        <div class="dims-grid" style="margin-top:24px;">
+
+          <div class="dim-card dim-primary">
+            <div class="dim-emoji">⚠️</div>
+            <div class="dim-name">Harmfulness</div>
+            <div class="dim-tag">Primary</div>
+          </div>
+
+          <div class="dim-card">
+            <div class="dim-emoji">🎯</div>
+            <div class="dim-name">Specificity</div>
+            <div class="dim-tag">On-target</div>
+          </div>
+
+          <div class="dim-card">
+            <div class="dim-emoji">🔗</div>
+            <div class="dim-name">Relevance</div>
+            <div class="dim-tag">Semantic</div>
+          </div>
+
+          <div class="dim-card">
+            <div class="dim-emoji">💬</div>
+            <div class="dim-name">Coherence</div>
+            <div class="dim-tag">Fluency</div>
+          </div>
+
+          <div class="dim-card">
+            <div class="dim-emoji">🚫</div>
+            <div class="dim-name">Non-refusal</div>
+            <div class="dim-tag">Compliance</div>
+          </div>
+
+        </div>
       </div>
 
-      <div class="cmp-body-row">
-        <div class="cmp-aspect">Target</div>
-        <div class="cmp-old"><span class="cmp-x">✗</span> Fixed "Sure, here is how to…" template</div>
-        <div class="cmp-new"><span class="cmp-check">✓</span> Sampled from model's current distribution</div>
-      </div>
-
-      <div class="cmp-body-row">
-        <div class="cmp-aspect">Judge</div>
-        <div class="cmp-old"><span class="cmp-x">✗</span> Harm score only — passes incoherent output</div>
-        <div class="cmp-new"><span class="cmp-check">✓</span> 5-dim composite: harm + 4 quality axes</div>
-      </div>
-
-      <div class="cmp-body-row">
-        <div class="cmp-aspect">Filter</div>
-        <div class="cmp-old"><span class="cmp-x">✗</span> No quality check — degenerate text counts</div>
-        <div class="cmp-new"><span class="cmp-check">✓</span> Degeneracy gate zeroes loops &amp; empty outputs</div>
-      </div>
-    </div>
-
-    <!-- Five dimensions -->
-    <div class="dims-grid">
-
-      <div class="dim-card dim-primary">
-        <div class="dim-emoji">⚠️</div>
-        <div class="dim-name">Harmfulness</div>
-        <div class="dim-tag">Primary</div>
-      </div>
-
-      <div class="dim-card">
-        <div class="dim-emoji">🎯</div>
-        <div class="dim-name">Specificity</div>
-        <div class="dim-tag">On-target</div>
-      </div>
-
-      <div class="dim-card">
-        <div class="dim-emoji">🔗</div>
-        <div class="dim-name">Relevance</div>
-        <div class="dim-tag">Semantic</div>
-      </div>
-
-      <div class="dim-card">
-        <div class="dim-emoji">💬</div>
-        <div class="dim-name">Coherence</div>
-        <div class="dim-tag">Fluency</div>
-      </div>
-
-      <div class="dim-card">
-        <div class="dim-emoji">🚫</div>
-        <div class="dim-name">Non-refusal</div>
-        <div class="dim-tag">Compliance</div>
+      <!-- Right: radar chart -->
+      <div style="flex:0 0 380px;display:flex;flex-direction:column;align-items:center;">
+        <img src="docs/radar_dja_vs_baselines.png"
+             alt="Radar chart: DJA vs COLD-Attack vs I-GCG across 5 scoring dimensions"
+             style="width:100%;border-radius:10px;border:1px solid var(--border);box-shadow:var(--shadow-sm);" />
+        <p style="font-size:12px;color:var(--text3);text-align:center;margin-top:10px;line-height:1.5;">
+          DJA vs. baselines on Mistral-7B-v0.3.<br/>
+          DJA dominates all four quality dimensions while matching harm coverage.
+        </p>
       </div>
 
     </div>
