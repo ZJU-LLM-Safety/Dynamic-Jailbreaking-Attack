@@ -285,6 +285,7 @@ class DJAEvaluator:
             best_suffix, response, best_iter,
             harm_score, final_score, quality_scores,
             ref_response, ref_harm_score, ref_final_score, _ref_quality,
+            _total_iters, _final_suffix_len, _early_stopped,
         ) = self._attacker.optimize_single_prompt_with_suffix_in_double_loop(
             prompt=prompt,
             verbose=verbose,
