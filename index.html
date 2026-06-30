@@ -439,45 +439,51 @@
   <div class="container">
     <h2 class="section-title">Why Static Attacks Fall Short</h2>
     <p class="section-sub">
-      Existing gradient-based jailbreaks fix the optimization target, suffix length, and sampling budget
-      before the attack begins. Each choice introduces a distinct failure mode that DJA resolves dynamically.
+      Existing gradient-based jailbreaks are formulated as a <em>static</em> adversarial optimization problem —
+      optimizing a fixed-length suffix toward a predefined target under a static strategy.
+      We argue this fully static formulation highly underestimates the effectiveness, efficiency,
+      and flexibility of gradient-based attacks.
     </p>
 
     <div class="method-grid">
 
-      <!-- Card 1: Static Target Pathology -->
+      <!-- Card 1: Static Target -->
       <div class="method-card">
         <div class="method-icon">🎯</div>
         <div class="method-title">Static Target is Flawed by Construction</div>
         <div class="method-tag-row">
-          <span class="method-tag-bad">Low-probability</span>
-          <span class="method-tag-bad">Low-risk</span>
+          <span class="method-tag-bad">Low-probability region</span>
           <span class="method-tag-bad">Prompt-unrelated</span>
         </div>
         <div class="method-quote">"Sure, here is how to…"</div>
-        <div class="method-desc">
-          This predefined template sits outside the model's natural output distribution,
-          forcing gradients to chase an unlikely pattern that is semantically disconnected
-          from the actual harmful intent.
+        <div class="method-fail-list">
+          <div class="method-fail-item">
+            <div class="method-fail-dot">1</div>
+            <div class="method-fail-text"><strong>Extremely low-probability</strong> — this predefined template lies outside the safety-aligned model's natural output distribution, requiring excessive iterations and limiting both effectiveness and efficiency.</div>
+          </div>
+          <div class="method-fail-item">
+            <div class="method-fail-dot">2</div>
+            <div class="method-fail-text"><strong>Semantically irrelevant</strong> — even when the target is reached, the full response may still be off-topic, as simple affirmative prefixes carry little prompt-related semantics.</div>
+          </div>
         </div>
       </div>
 
-      <!-- Card 2: Affirmative Prefix Failure Modes -->
+      <!-- Card 2: Static Strategy -->
       <div class="method-card">
-        <div class="method-icon">💬</div>
-        <div class="method-title">Affirmative Prefix Misdirects the Model</div>
+        <div class="method-icon">⚖️</div>
+        <div class="method-title">Static Strategy Ignores Attack Difficulty</div>
         <div class="method-tag-row">
-          <span class="method-tag-bad">Intent-unrelated output</span>
-          <span class="method-tag-bad">Affirm-then-refuse</span>
+          <span class="method-tag-bad">One-size-fits-all</span>
+          <span class="method-tag-bad">Ignores alignment strength</span>
         </div>
         <div class="method-fail-list">
           <div class="method-fail-item">
             <div class="method-fail-dot">1</div>
-            <div class="method-fail-text"><strong>Off-topic response</strong> — model complies with the surface form but generates content unrelated to the harmful intent.</div>
+            <div class="method-fail-text"><strong>Fails on hard prompts</strong> — against strongly aligned models, static attacks exhaust their fixed budget and still cannot succeed.</div>
           </div>
           <div class="method-fail-item">
             <div class="method-fail-dot">2</div>
-            <div class="method-fail-text"><strong>Implicit refusal</strong> — "Sure!" in the first sentence, rejection embedded in the next. Neither is caught by harm-only matching.</div>
+            <div class="method-fail-text"><strong>Wastes capacity on easy ones</strong> — for weakly aligned models or mild prompts, the same fixed capacity is redundant overhead that could be avoided entirely.</div>
           </div>
         </div>
       </div>
