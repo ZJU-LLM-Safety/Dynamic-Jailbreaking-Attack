@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>DJA — Dynamic Jailbreaking Attack</title>
-  <meta name="description" content="DJA is a gradient-based jailbreak framework with dynamic target, suffix, and optimization strategy. 100% ASR on 25 open-weight LLMs." />
+  <meta name="description" content="DJA is a gradient-based jailbreak framework with dynamic target, suffix, and optimization strategy. 100% ASR on 24 open-weight LLMs." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <style>
@@ -392,7 +392,7 @@
   <div class="container">
     <div class="hero-badges">
       <a href="https://arxiv.org/abs/2510.02422" target="_blank" class="badge blue">📄 arXiv 2510.02422</a>
-      <span class="badge green">✓ 100% ASR · 25 Models</span>
+      <span class="badge green">✓ 100% ASR · 24 Models</span>
       <span class="badge">Python 3.10+</span>
       <span class="badge">MIT License</span>
     </div>
@@ -403,8 +403,8 @@
     <p class="hero-desc">
       A gradient-based red-teaming framework that replaces the static optimization target,
       suffix length, and sampling budget of existing attacks with fully dynamic counterparts —
-      achieving <strong>100% ASR across 25 open-weight models (0.5B–32B)</strong>
-      spanning 7 model families on AdvBench-100.
+      achieving <strong>100% ASR across 24 open-weight models (0.5B-32B)</strong>
+      spanning 5 organizations on AdvBench-100.
     </p>
 
     <div class="hero-ctas">
@@ -419,12 +419,12 @@
         <div class="stat-label">ASR on all evaluated<br/>white-box models</div>
       </div>
       <div class="stat-card">
-        <div class="stat-num">25</div>
+        <div class="stat-num">24</div>
         <div class="stat-label">Open-weight models tested<br/>0.5B – 32B parameters</div>
       </div>
       <div class="stat-card">
-        <div class="stat-num">7</div>
-        <div class="stat-label">Model families covered<br/>Gemma · Llama · Mistral · Qwen</div>
+        <div class="stat-num">5</div>
+        <div class="stat-label">Organizations covered<br/>Google · Meta · Mistral · Alibaba · OpenAI</div>
       </div>
       <div class="stat-card">
         <div class="stat-num">5</div>
@@ -606,17 +606,27 @@
     <h2 class="section-title">Main Results</h2>
     <p class="section-sub">
       Evaluated on <strong>AdvBench-100</strong> using a GPT-4o-mini multi-objective scorer
-      (composite threshold ≥ 0.5). DJA achieves perfect ASR across all 25 evaluated open-weight models.
+      (composite threshold ≥ 0.5). DJA achieves perfect ASR across all 24 evaluated open-weight models.
     </p>
 
     <div class="asr-banner">
       <div class="asr-num">100%</div>
       <div class="asr-meta">
-        <strong>Attack Success Rate — across all 25 models</strong>
+        <strong>Attack Success Rate — across all 24 models</strong>
         DJA consistently outperforms gradient-based baselines including GCG,
         indicating that static formulations substantially underestimate LLM vulnerability
         to adaptive attacks.
       </div>
+    </div>
+
+    <div style="margin-bottom:40px;">
+      <img src="results/fig_bar_distribution.png"
+           alt="DJA Attack Round Distribution by Model"
+           style="width:100%;max-width:900px;display:block;margin:0 auto;border-radius:10px;border:1px solid var(--border);" />
+      <p style="text-align:center;font-size:12px;color:var(--text3);margin-top:10px;">
+        Distribution of optimization rounds required for successful attacks across all 24 models.
+        Green (≤10 rounds) indicates rapid convergence; most models are cracked within 50 rounds.
+      </p>
     </div>
 
     <div class="family-grid">
@@ -628,10 +638,9 @@
             <div class="family-name">Gemma</div>
             <div class="family-org">Google</div>
           </div>
-          <div class="family-asr">2 models</div>
+          <div class="family-asr">1 model</div>
         </div>
         <div class="model-list">
-          <div class="model-row"><span>Gemma</span><span class="model-size">7B</span><span class="model-check">✓ 100%</span></div>
           <div class="model-row"><span>Gemma2</span><span class="model-size">2B</span><span class="model-check">✓ 100%</span></div>
         </div>
       </div>
@@ -643,11 +652,12 @@
             <div class="family-name">Llama 3</div>
             <div class="family-org">Meta</div>
           </div>
-          <div class="family-asr">2 models</div>
+          <div class="family-asr">3 models</div>
         </div>
         <div class="model-list">
           <div class="model-row"><span>Llama 3</span><span class="model-size">8B</span><span class="model-check">✓ 100%</span></div>
           <div class="model-row"><span>Llama 3.2</span><span class="model-size">3B</span><span class="model-check">✓ 100%</span></div>
+          <div class="model-row"><span>Llama 3.2</span><span class="model-size">1B</span><span class="model-check">✓ 100%</span></div>
         </div>
       </div>
 
@@ -674,7 +684,7 @@
             <div class="family-name">Qwen2.5</div>
             <div class="family-org">Alibaba</div>
           </div>
-          <div class="family-asr">6 models</div>
+          <div class="family-asr">5 models</div>
         </div>
         <div class="model-list">
           <div class="model-row"><span>Qwen2.5</span><span class="model-size">0.5B</span><span class="model-check">✓ 100%</span></div>
@@ -682,7 +692,6 @@
           <div class="model-row"><span>Qwen2.5</span><span class="model-size">3B</span><span class="model-check">✓ 100%</span></div>
           <div class="model-row"><span>Qwen2.5</span><span class="model-size">7B</span><span class="model-check">✓ 100%</span></div>
           <div class="model-row"><span>Qwen2.5</span><span class="model-size">14B</span><span class="model-check">✓ 100%</span></div>
-          <div class="model-row"><span>Qwen2.5</span><span class="model-size">32B</span><span class="model-check">✓ 100%</span></div>
         </div>
       </div>
 
