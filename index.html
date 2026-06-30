@@ -619,14 +619,14 @@
       <div class="asr-num">100%</div>
       <div class="asr-meta">
         <strong>Attack Success Rate — across all 24 models</strong>
-        DJA consistently outperforms gradient-based baselines including GCG,
-        indicating that static formulations substantially underestimate LLM vulnerability
-        to adaptive attacks.
+        DJA consistently outperforms gradient-based baselines (GCG, COLD-Attack, AutoDAN, AdvPrefix),
+        demonstrating that fully static formulations substantially underestimate the effectiveness,
+        efficiency, and flexibility of gradient-based attacks.
       </div>
     </div>
 
     <div style="margin-bottom:40px;">
-      <img src="results/fig_bar_distribution.png"
+      <img src="docs/fig_bar_distribution.png"
            alt="DJA Attack Round Distribution by Model"
            style="width:100%;max-width:900px;display:block;margin:0 auto;border-radius:10px;border:1px solid var(--border);" />
       <p style="text-align:center;font-size:12px;color:var(--text3);margin-top:10px;">
@@ -755,8 +755,11 @@
     </div>
 
     <p class="results-note">
-      All results measured on AdvBench-100. Scorer: GPT-4o-mini multi-objective judge, composite threshold ≥ 0.5.
-      Post-hoc degeneracy gating applied to all reported ASR figures.
+      All results measured on <strong>AdvBench-100</strong>. A GPT-4o-mini multi-objective scorer evaluates each induced response across five dimensions —
+      harmfulness, feasibility, relevance, usefulness, and refusal-avoidance — and a composite score ≥ 0.5 is required for a successful attack.
+      DJA consistently achieves <strong>100% ASR on all 24 target models</strong>, substantially outperforming gradient-based baselines
+      (GCG, COLD-Attack, AutoDAN, AdvPrefix) under their recommended settings.
+      Notably, DJA jailbreaks <strong>Qwen3-32B with only 11.28 attack rounds on average</strong> per prompt.
       See <a href="https://arxiv.org/abs/2510.02422">the paper</a> for full experimental details and baseline comparisons.
     </p>
   </div>
